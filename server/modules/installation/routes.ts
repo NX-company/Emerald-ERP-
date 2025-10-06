@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { storage } from "../../storage";
+import { installationRepository } from "./repository";
 import { insertInstallationSchema } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
 
@@ -9,7 +9,7 @@ export const router = Router();
 router.get("/api/installations", async (req, res) => {
   try {
     const { status } = req.query;
-    const installations = await storage.getAllInstallations(status as string | undefined);
+    const installations = await installationRepository.getAllInstallations(status as string | undefined);
     res.json(installations);
   } catch (error) {
     console.error("Error fetching installations:", error);
@@ -21,7 +21,7 @@ router.get("/api/installations", async (req, res) => {
 router.get("/api/installations/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const installation = await storage.getInstallationById(id);
+    const installation = await installationRepository.getInstallationById(id);
     
     if (!installation) {
       res.status(404).json({ error: "Installation not found" });
@@ -46,7 +46,7 @@ router.post("/api/installations", async (req, res) => {
       return;
     }
     
-    const newInstallation = await storage.createInstallation(validationResult.data);
+    const newInstallation = await installationRepository.createInstallation(validationResult.data);
     res.status(201).json(newInstallation);
   } catch (error) {
     console.error("Error creating installation:", error);
@@ -66,7 +66,7 @@ router.put("/api/installations/:id", async (req, res) => {
       return;
     }
     
-    const updatedInstallation = await storage.updateInstallation(id, validationResult.data);
+    const updatedInstallation = await installationRepository.updateInstallation(id, validationResult.data);
     
     if (!updatedInstallation) {
       res.status(404).json({ error: "Installation not found" });
@@ -84,7 +84,7 @@ router.put("/api/installations/:id", async (req, res) => {
 router.delete("/api/installations/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const deleted = await storage.deleteInstallation(id);
+    const deleted = await installationRepository.deleteInstallation(id);
     
     if (!deleted) {
       res.status(404).json({ error: "Installation not found" });

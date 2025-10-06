@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { storage } from "../../storage";
+import { documentsRepository } from "./repository";
 import { insertDocumentSchema } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
 
@@ -11,7 +11,7 @@ export const router = Router();
 router.get("/api/documents", async (req, res) => {
   try {
     const { type, project_id } = req.query;
-    const documents = await storage.getAllDocuments(
+    const documents = await documentsRepository.getAllDocuments(
       type as string | undefined,
       project_id as string | undefined
     );
@@ -26,7 +26,7 @@ router.get("/api/documents", async (req, res) => {
 router.get("/api/documents/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const document = await storage.getDocumentById(id);
+    const document = await documentsRepository.getDocumentById(id);
     
     if (!document) {
       res.status(404).json({ error: "Document not found" });
@@ -51,7 +51,7 @@ router.post("/api/documents", async (req, res) => {
       return;
     }
     
-    const newDocument = await storage.createDocument(validationResult.data);
+    const newDocument = await documentsRepository.createDocument(validationResult.data);
     res.status(201).json(newDocument);
   } catch (error) {
     console.error("Error creating document:", error);
@@ -71,7 +71,7 @@ router.put("/api/documents/:id", async (req, res) => {
       return;
     }
     
-    const updatedDocument = await storage.updateDocument(id, validationResult.data);
+    const updatedDocument = await documentsRepository.updateDocument(id, validationResult.data);
     
     if (!updatedDocument) {
       res.status(404).json({ error: "Document not found" });
@@ -89,7 +89,7 @@ router.put("/api/documents/:id", async (req, res) => {
 router.delete("/api/documents/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const deleted = await storage.deleteDocument(id);
+    const deleted = await documentsRepository.deleteDocument(id);
     
     if (!deleted) {
       res.status(404).json({ error: "Document not found" });

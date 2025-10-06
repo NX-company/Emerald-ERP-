@@ -1,5 +1,6 @@
 import { Router } from "express";
-import { storage } from "../../storage";
+import { projectsRepository } from "./repository";
+import { salesRepository } from "../sales/repository";
 import { insertProjectSchema, insertProjectStageSchema } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
 
@@ -11,10 +12,10 @@ router.get("/api/projects", async (req, res) => {
     const { status } = req.query;
     
     if (status && typeof status === "string") {
-      const projects = await storage.getProjectsByStatus(status);
+      const projects = await projectsRepository.getProjectsByStatus(status);
       res.json(projects);
     } else {
-      const projects = await storage.getAllProjects();
+      const projects = await projectsRepository.getAllProjects();
       res.json(projects);
     }
   } catch (error) {
@@ -27,7 +28,7 @@ router.get("/api/projects", async (req, res) => {
 router.get("/api/projects/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const project = await storage.getProjectById(id);
+    const project = await projectsRepository.getProjectById(id);
     
     if (!project) {
       res.status(404).json({ error: "Project not found" });
@@ -53,14 +54,14 @@ router.post("/api/projects", async (req, res) => {
     }
     
     if (validationResult.data.deal_id) {
-      const deal = await storage.getDealById(validationResult.data.deal_id);
+      const deal = await salesRepository.getDealById(validationResult.data.deal_id);
       if (!deal) {
         res.status(400).json({ error: "Deal not found" });
         return;
       }
     }
     
-    const newProject = await storage.createProject(validationResult.data);
+    const newProject = await projectsRepository.createProject(validationResult.data);
     res.status(201).json(newProject);
   } catch (error) {
     console.error("Error creating project:", error);
@@ -82,14 +83,14 @@ router.put("/api/projects/:id", async (req, res) => {
     }
     
     if (validationResult.data.deal_id) {
-      const deal = await storage.getDealById(validationResult.data.deal_id);
+      const deal = await salesRepository.getDealById(validationResult.data.deal_id);
       if (!deal) {
         res.status(400).json({ error: "Deal not found" });
         return;
       }
     }
     
-    const updatedProject = await storage.updateProject(id, validationResult.data);
+    const updatedProject = await projectsRepository.updateProject(id, validationResult.data);
     
     if (!updatedProject) {
       res.status(404).json({ error: "Project not found" });
@@ -107,7 +108,7 @@ router.put("/api/projects/:id", async (req, res) => {
 router.delete("/api/projects/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const deleted = await storage.deleteProject(id);
+    const deleted = await projectsRepository.deleteProject(id);
     
     if (!deleted) {
       res.status(404).json({ error: "Project not found" });
@@ -126,13 +127,13 @@ router.get("/api/projects/:id/stages", async (req, res) => {
   try {
     const { id } = req.params;
     
-    const project = await storage.getProjectById(id);
+    const project = await projectsRepository.getProjectById(id);
     if (!project) {
       res.status(404).json({ error: "Project not found" });
       return;
     }
     
-    const stages = await storage.getProjectStages(id);
+    const stages = await projectsRepository.getProjectStages(id);
     res.json(stages);
   } catch (error) {
     console.error("Error fetching project stages:", error);
@@ -145,7 +146,7 @@ router.post("/api/projects/:id/stages", async (req, res) => {
   try {
     const { id } = req.params;
     
-    const project = await storage.getProjectById(id);
+    const project = await projectsRepository.getProjectById(id);
     if (!project) {
       res.status(404).json({ error: "Project not found" });
       return;
@@ -162,7 +163,7 @@ router.post("/api/projects/:id/stages", async (req, res) => {
       return;
     }
     
-    const newStage = await storage.createProjectStage(validationResult.data);
+    const newStage = await projectsRepository.createProjectStage(validationResult.data);
     res.status(201).json(newStage);
   } catch (error) {
     console.error("Error creating project stage:", error);
@@ -183,7 +184,7 @@ router.put("/api/projects/stages/:stageId", async (req, res) => {
       return;
     }
     
-    const updatedStage = await storage.updateProjectStage(stageId, validationResult.data);
+    const updatedStage = await projectsRepository.updateProjectStage(stageId, validationResult.data);
     
     if (!updatedStage) {
       res.status(404).json({ error: "Project stage not found" });
@@ -201,7 +202,7 @@ router.put("/api/projects/stages/:stageId", async (req, res) => {
 router.delete("/api/projects/stages/:stageId", async (req, res) => {
   try {
     const { stageId } = req.params;
-    const deleted = await storage.deleteProjectStage(stageId);
+    const deleted = await projectsRepository.deleteProjectStage(stageId);
     
     if (!deleted) {
       res.status(404).json({ error: "Project stage not found" });

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { storage } from "../../storage";
+import { financeRepository } from "./repository";
 import { insertFinancialTransactionSchema } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
 
@@ -15,7 +15,7 @@ router.get("/api/finance/transactions", async (req, res) => {
     const fromDate = from ? new Date(from as string) : undefined;
     const toDate = to ? new Date(to as string) : undefined;
     
-    const transactions = await storage.getAllFinancialTransactions(
+    const transactions = await financeRepository.getAllFinancialTransactions(
       type as string | undefined,
       fromDate,
       toDate
@@ -38,7 +38,7 @@ router.post("/api/finance/transactions", async (req, res) => {
       return;
     }
     
-    const newTransaction = await storage.createFinancialTransaction(validationResult.data);
+    const newTransaction = await financeRepository.createFinancialTransaction(validationResult.data);
     res.status(201).json(newTransaction);
   } catch (error) {
     console.error("Error creating financial transaction:", error);
@@ -49,7 +49,7 @@ router.post("/api/finance/transactions", async (req, res) => {
 // GET /api/finance/stats - Get financial statistics
 router.get("/api/finance/stats", async (req, res) => {
   try {
-    const stats = await storage.getFinancialStats();
+    const stats = await financeRepository.getFinancialStats();
     res.json(stats);
   } catch (error) {
     console.error("Error fetching financial stats:", error);
@@ -61,7 +61,7 @@ router.get("/api/finance/stats", async (req, res) => {
 router.get("/api/finance/projects/:projectId", async (req, res) => {
   try {
     const { projectId } = req.params;
-    const financials = await storage.getProjectFinancials(projectId);
+    const financials = await financeRepository.getProjectFinancials(projectId);
     res.json(financials);
   } catch (error) {
     console.error("Error fetching project financials:", error);

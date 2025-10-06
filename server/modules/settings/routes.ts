@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { storage } from "../../storage";
+import { settingsRepository } from "./repository";
 import { insertCompanySettingsSchema } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
 
@@ -10,7 +10,7 @@ export const router = Router();
 // GET /api/settings/company - Get company settings
 router.get("/api/settings/company", async (req, res) => {
   try {
-    const settings = await storage.getCompanySettings();
+    const settings = await settingsRepository.getCompanySettings();
     
     if (!settings) {
       res.status(404).json({ error: "Company settings not found" });
@@ -35,7 +35,7 @@ router.put("/api/settings/company", async (req, res) => {
       return;
     }
     
-    const updatedSettings = await storage.updateCompanySettings(validationResult.data);
+    const updatedSettings = await settingsRepository.updateCompanySettings(validationResult.data);
     res.json(updatedSettings);
   } catch (error) {
     console.error("Error updating company settings:", error);

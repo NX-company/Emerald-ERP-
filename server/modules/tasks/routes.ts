@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { storage } from "../../storage";
+import { tasksRepository } from "./repository";
 import { insertTaskSchema } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
 
@@ -11,7 +11,7 @@ export const router = Router();
 router.get("/api/tasks", async (req, res) => {
   try {
     const { status, priority, assignee_id } = req.query;
-    const tasks = await storage.getAllTasks(
+    const tasks = await tasksRepository.getAllTasks(
       status as string | undefined,
       priority as string | undefined,
       assignee_id as string | undefined
@@ -27,7 +27,7 @@ router.get("/api/tasks", async (req, res) => {
 router.get("/api/tasks/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const task = await storage.getTaskById(id);
+    const task = await tasksRepository.getTaskById(id);
     
     if (!task) {
       res.status(404).json({ error: "Task not found" });
@@ -52,7 +52,7 @@ router.post("/api/tasks", async (req, res) => {
       return;
     }
     
-    const newTask = await storage.createTask(validationResult.data);
+    const newTask = await tasksRepository.createTask(validationResult.data);
     res.status(201).json(newTask);
   } catch (error) {
     console.error("Error creating task:", error);
@@ -72,7 +72,7 @@ router.put("/api/tasks/:id", async (req, res) => {
       return;
     }
     
-    const updatedTask = await storage.updateTask(id, validationResult.data);
+    const updatedTask = await tasksRepository.updateTask(id, validationResult.data);
     
     if (!updatedTask) {
       res.status(404).json({ error: "Task not found" });
@@ -90,7 +90,7 @@ router.put("/api/tasks/:id", async (req, res) => {
 router.delete("/api/tasks/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const deleted = await storage.deleteTask(id);
+    const deleted = await tasksRepository.deleteTask(id);
     
     if (!deleted) {
       res.status(404).json({ error: "Task not found" });

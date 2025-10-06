@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { storage } from "../../storage";
+import { salesRepository } from "./repository";
 import { insertDealSchema, insertDealStageSchema } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
 
@@ -7,7 +7,7 @@ export const router = Router();
 
 async function initializeDefaultDealStages() {
   try {
-    const existingStages = await storage.getAllDealStages();
+    const existingStages = await salesRepository.getAllDealStages();
     
     if (existingStages.length === 0) {
       const defaultStages = [
@@ -20,7 +20,7 @@ async function initializeDefaultDealStages() {
       ];
       
       await Promise.all(
-        defaultStages.map(stage => storage.createDealStage(stage))
+        defaultStages.map(stage => salesRepository.createDealStage(stage))
       );
       
       console.log("Default deal stages created successfully");
@@ -40,10 +40,10 @@ router.get("/api/deals", async (req, res) => {
     const { stage } = req.query;
     
     if (stage && typeof stage === "string") {
-      const deals = await storage.getDealsByStage(stage);
+      const deals = await salesRepository.getDealsByStage(stage);
       res.json(deals);
     } else {
-      const deals = await storage.getAllDeals();
+      const deals = await salesRepository.getAllDeals();
       res.json(deals);
     }
   } catch (error) {
@@ -56,7 +56,7 @@ router.get("/api/deals", async (req, res) => {
 router.get("/api/deals/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const deal = await storage.getDealById(id);
+    const deal = await salesRepository.getDealById(id);
     
     if (!deal) {
       res.status(404).json({ error: "Deal not found" });
@@ -81,7 +81,7 @@ router.post("/api/deals", async (req, res) => {
       return;
     }
     
-    const newDeal = await storage.createDeal(validationResult.data);
+    const newDeal = await salesRepository.createDeal(validationResult.data);
     res.status(201).json(newDeal);
   } catch (error) {
     console.error("Error creating deal:", error);
@@ -103,7 +103,7 @@ router.put("/api/deals/:id", async (req, res) => {
       return;
     }
     
-    const updatedDeal = await storage.updateDeal(id, validationResult.data);
+    const updatedDeal = await salesRepository.updateDeal(id, validationResult.data);
     
     if (!updatedDeal) {
       res.status(404).json({ error: "Deal not found" });
@@ -121,7 +121,7 @@ router.put("/api/deals/:id", async (req, res) => {
 router.delete("/api/deals/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const deleted = await storage.deleteDeal(id);
+    const deleted = await salesRepository.deleteDeal(id);
     
     if (!deleted) {
       res.status(404).json({ error: "Deal not found" });
@@ -140,7 +140,7 @@ router.delete("/api/deals/:id", async (req, res) => {
 // GET /api/deal-stages - Get all deal stages
 router.get("/api/deal-stages", async (req, res) => {
   try {
-    const stages = await storage.getAllDealStages();
+    const stages = await salesRepository.getAllDealStages();
     res.json(stages);
   } catch (error) {
     console.error("Error fetching deal stages:", error);
@@ -152,7 +152,7 @@ router.get("/api/deal-stages", async (req, res) => {
 router.get("/api/deal-stages/:stageKey/count", async (req, res) => {
   try {
     const { stageKey } = req.params;
-    const count = await storage.countDealsByStage(stageKey);
+    const count = await salesRepository.countDealsByStage(stageKey);
     res.json({ count });
   } catch (error) {
     console.error("Error counting deals:", error);
@@ -171,7 +171,7 @@ router.post("/api/deal-stages", async (req, res) => {
       return;
     }
     
-    const newStage = await storage.createDealStage(validationResult.data);
+    const newStage = await salesRepository.createDealStage(validationResult.data);
     res.status(201).json(newStage);
   } catch (error) {
     console.error("Error creating deal stage:", error);
@@ -192,7 +192,7 @@ router.put("/api/deal-stages/:id", async (req, res) => {
       return;
     }
     
-    const updatedStage = await storage.updateDealStage(id, validationResult.data);
+    const updatedStage = await salesRepository.updateDealStage(id, validationResult.data);
     
     if (!updatedStage) {
       res.status(404).json({ error: "Deal stage not found" });
@@ -212,13 +212,13 @@ router.delete("/api/deal-stages/:id", async (req, res) => {
     const { id } = req.params;
     const { targetStageKey } = req.query;
     
-    const stage = await storage.getDealStageById(id);
+    const stage = await salesRepository.getDealStageById(id);
     if (!stage) {
       res.status(404).json({ error: "Deal stage not found" });
       return;
     }
     
-    const dealsCount = await storage.countDealsByStage(stage.key);
+    const dealsCount = await salesRepository.countDealsByStage(stage.key);
     
     if (dealsCount > 0) {
       if (!targetStageKey || typeof targetStageKey !== "string") {
@@ -229,10 +229,10 @@ router.delete("/api/deal-stages/:id", async (req, res) => {
         return;
       }
       
-      await storage.updateDealsStage(stage.key, targetStageKey);
+      await salesRepository.updateDealsStage(stage.key, targetStageKey);
     }
     
-    const deleted = await storage.deleteDealStage(id);
+    const deleted = await salesRepository.deleteDealStage(id);
     
     if (!deleted) {
       res.status(404).json({ error: "Deal stage not found" });
@@ -256,7 +256,7 @@ router.put("/api/deal-stages/reorder", async (req, res) => {
       return;
     }
     
-    await storage.reorderDealStages(stages);
+    await salesRepository.reorderDealStages(stages);
     res.status(204).send();
   } catch (error) {
     console.error("Error reordering deal stages:", error);

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { storage } from "../../storage";
+import { productionRepository } from "./repository";
 import { insertProductionTaskSchema, insertProductionStageSchema } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
 
@@ -11,7 +11,7 @@ export const router = Router();
 router.get("/api/production", async (req, res) => {
   try {
     const { status } = req.query;
-    const tasks = await storage.getAllProductionTasks(status as string | undefined);
+    const tasks = await productionRepository.getAllProductionTasks(status as string | undefined);
     res.json(tasks);
   } catch (error) {
     console.error("Error fetching production tasks:", error);
@@ -23,7 +23,7 @@ router.get("/api/production", async (req, res) => {
 router.get("/api/production/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const task = await storage.getProductionTaskById(id);
+    const task = await productionRepository.getProductionTaskById(id);
     
     if (!task) {
       res.status(404).json({ error: "Production task not found" });
@@ -48,7 +48,7 @@ router.post("/api/production", async (req, res) => {
       return;
     }
     
-    const newTask = await storage.createProductionTask(validationResult.data);
+    const newTask = await productionRepository.createProductionTask(validationResult.data);
     res.status(201).json(newTask);
   } catch (error) {
     console.error("Error creating production task:", error);
@@ -68,7 +68,7 @@ router.put("/api/production/:id", async (req, res) => {
       return;
     }
     
-    const updatedTask = await storage.updateProductionTask(id, validationResult.data);
+    const updatedTask = await productionRepository.updateProductionTask(id, validationResult.data);
     
     if (!updatedTask) {
       res.status(404).json({ error: "Production task not found" });
@@ -86,7 +86,7 @@ router.put("/api/production/:id", async (req, res) => {
 router.delete("/api/production/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const deleted = await storage.deleteProductionTask(id);
+    const deleted = await productionRepository.deleteProductionTask(id);
     
     if (!deleted) {
       res.status(404).json({ error: "Production task not found" });
@@ -105,13 +105,13 @@ router.get("/api/production/:id/stages", async (req, res) => {
   try {
     const { id } = req.params;
     
-    const task = await storage.getProductionTaskById(id);
+    const task = await productionRepository.getProductionTaskById(id);
     if (!task) {
       res.status(404).json({ error: "Production task not found" });
       return;
     }
     
-    const stages = await storage.getProductionStages(id);
+    const stages = await productionRepository.getProductionStages(id);
     res.json(stages);
   } catch (error) {
     console.error("Error fetching production stages:", error);
@@ -124,7 +124,7 @@ router.post("/api/production/:id/stages", async (req, res) => {
   try {
     const { id } = req.params;
     
-    const task = await storage.getProductionTaskById(id);
+    const task = await productionRepository.getProductionTaskById(id);
     if (!task) {
       res.status(404).json({ error: "Production task not found" });
       return;
@@ -141,7 +141,7 @@ router.post("/api/production/:id/stages", async (req, res) => {
       return;
     }
     
-    const newStage = await storage.createProductionStage(validationResult.data);
+    const newStage = await productionRepository.createProductionStage(validationResult.data);
     res.status(201).json(newStage);
   } catch (error) {
     console.error("Error creating production stage:", error);
@@ -161,7 +161,7 @@ router.put("/api/production/stages/:stageId", async (req, res) => {
       return;
     }
     
-    const updatedStage = await storage.updateProductionStage(stageId, validationResult.data);
+    const updatedStage = await productionRepository.updateProductionStage(stageId, validationResult.data);
     
     if (!updatedStage) {
       res.status(404).json({ error: "Production stage not found" });
@@ -179,7 +179,7 @@ router.put("/api/production/stages/:stageId", async (req, res) => {
 router.delete("/api/production/stages/:stageId", async (req, res) => {
   try {
     const { stageId } = req.params;
-    const deleted = await storage.deleteProductionStage(stageId);
+    const deleted = await productionRepository.deleteProductionStage(stageId);
     
     if (!deleted) {
       res.status(404).json({ error: "Production stage not found" });

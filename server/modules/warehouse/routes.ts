@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { storage } from "../../storage";
+import { warehouseRepository } from "./repository";
 import { insertWarehouseItemSchema, insertWarehouseTransactionSchema } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
 
@@ -11,7 +11,7 @@ export const router = Router();
 router.get("/api/warehouse", async (req, res) => {
   try {
     const { category, status } = req.query;
-    const items = await storage.getAllWarehouseItems(
+    const items = await warehouseRepository.getAllWarehouseItems(
       category as string | undefined,
       status as string | undefined
     );
@@ -26,7 +26,7 @@ router.get("/api/warehouse", async (req, res) => {
 router.get("/api/warehouse/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const item = await storage.getWarehouseItemById(id);
+    const item = await warehouseRepository.getWarehouseItemById(id);
     
     if (!item) {
       res.status(404).json({ error: "Warehouse item not found" });
@@ -51,7 +51,7 @@ router.post("/api/warehouse", async (req, res) => {
       return;
     }
     
-    const newItem = await storage.createWarehouseItem(validationResult.data);
+    const newItem = await warehouseRepository.createWarehouseItem(validationResult.data);
     res.status(201).json(newItem);
   } catch (error) {
     console.error("Error creating warehouse item:", error);
@@ -71,7 +71,7 @@ router.put("/api/warehouse/:id", async (req, res) => {
       return;
     }
     
-    const updatedItem = await storage.updateWarehouseItem(id, validationResult.data);
+    const updatedItem = await warehouseRepository.updateWarehouseItem(id, validationResult.data);
     
     if (!updatedItem) {
       res.status(404).json({ error: "Warehouse item not found" });
@@ -89,7 +89,7 @@ router.put("/api/warehouse/:id", async (req, res) => {
 router.delete("/api/warehouse/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const deleted = await storage.deleteWarehouseItem(id);
+    const deleted = await warehouseRepository.deleteWarehouseItem(id);
     
     if (!deleted) {
       res.status(404).json({ error: "Warehouse item not found" });
@@ -121,7 +121,7 @@ router.post("/api/warehouse/:id/transactions", async (req, res) => {
       return;
     }
     
-    const newTransaction = await storage.createTransaction(validationResult.data);
+    const newTransaction = await warehouseRepository.createTransaction(validationResult.data);
     res.status(201).json(newTransaction);
   } catch (error) {
     console.error("Error creating warehouse transaction:", error);
@@ -133,7 +133,7 @@ router.post("/api/warehouse/:id/transactions", async (req, res) => {
 router.get("/api/warehouse/:id/transactions", async (req, res) => {
   try {
     const { id } = req.params;
-    const transactions = await storage.getWarehouseTransactions(id);
+    const transactions = await warehouseRepository.getWarehouseTransactions(id);
     res.json(transactions);
   } catch (error) {
     console.error("Error fetching warehouse transactions:", error);

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { storage } from "../../storage";
+import { usersRepository } from "./repository";
 import { insertUserSchema } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
 
@@ -8,7 +8,7 @@ export const router = Router();
 // GET /api/users - Get all users
 router.get("/api/users", async (req, res) => {
   try {
-    const users = await storage.getAllUsers();
+    const users = await usersRepository.getAllUsers();
     res.json(users);
   } catch (error) {
     console.error("Error fetching users:", error);
@@ -20,7 +20,7 @@ router.get("/api/users", async (req, res) => {
 router.get("/api/users/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const user = await storage.getUser(id);
+    const user = await usersRepository.getUser(id);
     
     if (!user) {
       res.status(404).json({ error: "User not found" });
@@ -51,7 +51,7 @@ router.put("/api/users/:id", async (req, res) => {
       return;
     }
     
-    const updatedUser = await storage.updateUser(id, validationResult.data);
+    const updatedUser = await usersRepository.updateUser(id, validationResult.data);
     
     if (!updatedUser) {
       res.status(404).json({ error: "User not found" });
@@ -69,7 +69,7 @@ router.put("/api/users/:id", async (req, res) => {
 router.delete("/api/users/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const deleted = await storage.deleteUser(id);
+    const deleted = await usersRepository.deleteUser(id);
     
     if (!deleted) {
       res.status(404).json({ error: "User not found" });
