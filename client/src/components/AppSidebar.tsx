@@ -55,13 +55,13 @@ export function AppSidebar({ activeModule = "/" }: AppSidebarProps) {
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="border-b border-sidebar-border p-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary text-primary-foreground font-bold text-lg">
+        <div className="flex items-center gap-3 group-data-[collapsible=icon]:justify-center">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground font-bold text-lg">
             E
           </div>
-          <div className="group-data-[collapsible=icon]:hidden">
-            <h2 className="font-semibold text-sidebar-foreground">Emerald ERP</h2>
-            <p className="text-xs text-muted-foreground">Фабрика мебели</p>
+          <div className="group-data-[collapsible=icon]:hidden overflow-hidden">
+            <h2 className="font-semibold text-sidebar-foreground truncate">Emerald ERP</h2>
+            <p className="text-xs text-muted-foreground truncate">Фабрика мебели</p>
           </div>
         </div>
       </SidebarHeader>
@@ -76,11 +76,12 @@ export function AppSidebar({ activeModule = "/" }: AppSidebarProps) {
                   <SidebarMenuButton
                     asChild
                     isActive={activeModule === item.url}
+                    tooltip={item.title}
                     data-testid={`link-${item.title.toLowerCase()}`}
                   >
                     <a href={item.url}>
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
+                      <item.icon />
+                      <span className="group-data-[collapsible=icon]:hidden">{item.title}</span>
                     </a>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -98,11 +99,12 @@ export function AppSidebar({ activeModule = "/" }: AppSidebarProps) {
                   <SidebarMenuButton
                     asChild
                     isActive={activeModule === item.url}
+                    tooltip={item.title}
                     data-testid={`link-${item.title.toLowerCase()}`}
                   >
                     <a href={item.url}>
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
+                      <item.icon />
+                      <span className="group-data-[collapsible=icon]:hidden">{item.title}</span>
                     </a>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -119,11 +121,12 @@ export function AppSidebar({ activeModule = "/" }: AppSidebarProps) {
                   <SidebarMenuButton
                     asChild
                     isActive={activeModule === item.url}
+                    tooltip={item.title}
                     data-testid={`link-${item.title.toLowerCase()}`}
                   >
                     <a href={item.url}>
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
+                      <item.icon />
+                      <span className="group-data-[collapsible=icon]:hidden">{item.title}</span>
                     </a>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -134,9 +137,9 @@ export function AppSidebar({ activeModule = "/" }: AppSidebarProps) {
       </SidebarContent>
 
       <SidebarFooter className="border-t border-sidebar-border p-4">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 group-data-[collapsible=icon]:justify-center">
           <UserAvatar name="Иван Петров" size="sm" />
-          <div className="flex-1 min-w-0 group-data-[collapsible=icon]:hidden">
+          <div className="flex-1 min-w-0 group-data-[collapsible=icon]:hidden overflow-hidden">
             <p className="text-sm font-medium text-sidebar-foreground truncate">Иван Петров</p>
             <p className="text-xs text-muted-foreground truncate">Директор</p>
           </div>
