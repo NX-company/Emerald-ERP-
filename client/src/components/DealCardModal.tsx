@@ -5,13 +5,15 @@ import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Mail, Phone, Building2, DollarSign, MessageSquare, CheckSquare, Activity, Brain, Plus, FolderOpen, FileText } from "lucide-react";
+import { Mail, Phone, Building2, DollarSign, MessageSquare, CheckSquare, Activity, Brain, Plus, FolderOpen, FileText, Trash2 } from "lucide-react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { DocumentFormDialog } from "@/components/DocumentFormDialog";
-import type { Deal, DealMessage, InsertDealMessage, DealDocument } from "@shared/schema";
+import { DeleteDealDialog } from "@/components/DeleteDealDialog";
+import { useToast } from "@/hooks/use-toast";
+import type { Deal, DealMessage, InsertDealMessage, DealDocument, User } from "@shared/schema";
 
 interface DealCardModalProps {
   dealId: string | null;
@@ -41,6 +43,14 @@ export function DealCardModal({ dealId, open, onOpenChange }: DealCardModalProps
   const [quoteDialogOpen, setQuoteDialogOpen] = useState(false);
   const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
   const [contractDialogOpen, setContractDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  
+  const { toast } = useToast();
+
+  const { data: currentUser } = useQuery<User>({
+    queryKey: ['/api/users', 'c2fdd40b-dadf-4fbb-848a-74283d14802e'],
+    enabled: open,
+  });
 
   // Логика воркфлоу
   const hasQuote = documents.some(doc => doc.document_type === 'quote');
@@ -62,6 +72,28 @@ export function DealCardModal({ dealId, open, onOpenChange }: DealCardModalProps
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/deals', dealId, 'messages'] });
       setMessageText("");
+    },
+  });
+
+  const deleteDeal = useMutation({
+    mutationFn: async () => {
+      return await apiRequest('DELETE', `/api/deals/${dealId}?userId=c2fdd40b-dadf-4fbb-848a-74283d14802e`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/deals'] });
+      toast({
+        title: "Сделка удалена",
+        description: "Сделка успешно удалена",
+      });
+      setDeleteDialogOpen(false);
+      onOpenChange(false);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Ошибка",
+        description: error.message || "Не удалось удалить сделку",
+        variant: "destructive",
+      });
     },
   });
 
@@ -352,10 +384,34 @@ export function DealCardModal({ dealId, open, onOpenChange }: DealCardModalProps
                 <FolderOpen className="w-4 h-4" />
                 Документы
               </Button>
+
+              {/* Кнопка удаления */}
+              {currentUser?.can_delete_deals && (
+                <>
+                  <Separator className="my-4" />
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start gap-2 text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                    onClick={() => setDeleteDialogOpen(true)}
+                    data-testid="button-delete-deal"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Удалить сделку
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         )}
       </DialogContent>
+
+      <DeleteDealDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onConfirm={() => deleteDeal.mutate()}
+        dealName={deal?.client_name || "Сделка"}
+        isPending={deleteDeal.isPending}
+      />
 
       <DocumentFormDialog
         open={quoteDialogOpen}
