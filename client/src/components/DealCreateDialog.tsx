@@ -53,7 +53,7 @@ export function DealCreateDialog({ open, onOpenChange }: DealCreateDialogProps) 
       amount: "",
       stage: "new" as const,
       manager_id: "",
-      production_days_count: "",
+      production_days_count: undefined,
       tags: [] as string[],
     },
   });
@@ -65,7 +65,7 @@ export function DealCreateDialog({ open, onOpenChange }: DealCreateDialogProps) 
         amount: data.amount || null,
         company: data.company || null,
         manager_id: data.manager_id || null,
-        production_days_count: data.production_days_count ? parseInt(data.production_days_count) : null,
+        production_days_count: data.production_days_count || null,
         tags: data.tags.length > 0 ? data.tags : null,
       };
       await apiRequest("POST", "/api/deals", dealData);
@@ -261,6 +261,7 @@ export function DealCreateDialog({ open, onOpenChange }: DealCreateDialogProps) 
                       min="1"
                       placeholder="Количество рабочих дней" 
                       data-testid="input-create-production-days"
+                      onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : "")}
                     />
                   </FormControl>
                   <FormMessage />
