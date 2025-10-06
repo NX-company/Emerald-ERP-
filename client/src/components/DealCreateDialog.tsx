@@ -52,7 +52,6 @@ export function DealCreateDialog({ open, onOpenChange }: DealCreateDialogProps) 
       company: "",
       amount: "",
       stage: "new" as const,
-      deadline: "",
       manager_id: "",
       production_days_count: "",
       tags: [] as string[],
@@ -65,7 +64,6 @@ export function DealCreateDialog({ open, onOpenChange }: DealCreateDialogProps) 
         ...data,
         amount: data.amount || null,
         company: data.company || null,
-        deadline: data.deadline ? new Date(data.deadline).toISOString() : null,
         manager_id: data.manager_id || null,
         production_days_count: data.production_days_count ? parseInt(data.production_days_count) : null,
         tags: data.tags.length > 0 ? data.tags : null,
@@ -216,24 +214,6 @@ export function DealCreateDialog({ open, onOpenChange }: DealCreateDialogProps) 
                       </SelectItem>
                     </SelectContent>
                   </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="deadline"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Срок</FormLabel>
-                  <FormControl>
-                    <Input 
-                      {...field} 
-                      type="datetime-local" 
-                      data-testid="input-create-deadline"
-                    />
-                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
