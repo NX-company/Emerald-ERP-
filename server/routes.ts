@@ -2,7 +2,8 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { 
-  insertDealSchema, 
+  insertDealSchema,
+  insertDealStageSchema,
   insertProjectSchema, 
   insertProjectStageSchema,
   insertProductionTaskSchema,
@@ -18,7 +19,34 @@ import {
 } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
 
+async function initializeDefaultDealStages() {
+  try {
+    const existingStages = await storage.getAllDealStages();
+    
+    if (existingStages.length === 0) {
+      const defaultStages = [
+        { key: "new", name: "Новые", color: "#6366f1", order: 1 },
+        { key: "meeting", name: "Встреча назначена", color: "#8b5cf6", order: 2 },
+        { key: "proposal", name: "КП отправлено", color: "#0ea5e9", order: 3 },
+        { key: "contract", name: "Договор", color: "#f59e0b", order: 4 },
+        { key: "won", name: "Выиграна", color: "#10b981", order: 5 },
+        { key: "lost", name: "Проиграна", color: "#ef4444", order: 6 },
+      ];
+      
+      await Promise.all(
+        defaultStages.map(stage => storage.createDealStage(stage))
+      );
+      
+      console.log("Default deal stages created successfully");
+    }
+  } catch (error) {
+    console.error("Error initializing default deal stages:", error);
+  }
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
+  await initializeDefaultDealStages();
+
   // GET /api/deals - Get all deals or filter by stage
   app.get("/api/deals", async (req, res) => {
     try {
@@ -117,6 +145,135 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting deal:", error);
       res.status(500).json({ error: "Failed to delete deal" });
+    }
+  });
+
+  // ========== Deal Stages Endpoints ==========
+
+  // GET /api/deal-stages - Get all deal stages
+  app.get("/api/deal-stages", async (req, res) => {
+    try {
+      const stages = await storage.getAllDealStages();
+      res.json(stages);
+    } catch (error) {
+      console.error("Error fetching deal stages:", error);
+      res.status(500).json({ error: "Failed to fetch deal stages" });
+    }
+  });
+
+  // GET /api/deal-stages/:stageKey/count - Count deals by stage key
+  app.get("/api/deal-stages/:stageKey/count", async (req, res) => {
+    try {
+      const { stageKey } = req.params;
+      const count = await storage.countDealsByStage(stageKey);
+      res.json({ count });
+    } catch (error) {
+      console.error("Error counting deals:", error);
+      res.status(500).json({ error: "Failed to count deals" });
+    }
+  });
+
+  // POST /api/deal-stages - Create new deal stage
+  app.post("/api/deal-stages", async (req, res) => {
+    try {
+      const validationResult = insertDealStageSchema.safeParse(req.body);
+      
+      if (!validationResult.success) {
+        const errorMessage = fromZodError(validationResult.error).toString();
+        res.status(400).json({ error: errorMessage });
+        return;
+      }
+      
+      const newStage = await storage.createDealStage(validationResult.data);
+      res.status(201).json(newStage);
+    } catch (error) {
+      console.error("Error creating deal stage:", error);
+      res.status(500).json({ error: "Failed to create deal stage" });
+    }
+  });
+
+  // PUT /api/deal-stages/:id - Update deal stage
+  app.put("/api/deal-stages/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      const validationResult = insertDealStageSchema.partial().safeParse(req.body);
+      
+      if (!validationResult.success) {
+        const errorMessage = fromZodError(validationResult.error).toString();
+        res.status(400).json({ error: errorMessage });
+        return;
+      }
+      
+      const updatedStage = await storage.updateDealStage(id, validationResult.data);
+      
+      if (!updatedStage) {
+        res.status(404).json({ error: "Deal stage not found" });
+        return;
+      }
+      
+      res.json(updatedStage);
+    } catch (error) {
+      console.error("Error updating deal stage:", error);
+      res.status(500).json({ error: "Failed to update deal stage" });
+    }
+  });
+
+  // DELETE /api/deal-stages/:id - Delete deal stage
+  app.delete("/api/deal-stages/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { targetStageKey } = req.query;
+      
+      const stage = await storage.getDealStageById(id);
+      if (!stage) {
+        res.status(404).json({ error: "Deal stage not found" });
+        return;
+      }
+      
+      const dealsCount = await storage.countDealsByStage(stage.key);
+      
+      if (dealsCount > 0) {
+        if (!targetStageKey || typeof targetStageKey !== "string") {
+          res.status(400).json({ 
+            error: "Stage has deals. Provide targetStageKey to move them.",
+            dealsCount 
+          });
+          return;
+        }
+        
+        await storage.updateDealsStage(stage.key, targetStageKey);
+      }
+      
+      const deleted = await storage.deleteDealStage(id);
+      
+      if (!deleted) {
+        res.status(404).json({ error: "Deal stage not found" });
+        return;
+      }
+      
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting deal stage:", error);
+      res.status(500).json({ error: "Failed to delete deal stage" });
+    }
+  });
+
+  // PUT /api/deal-stages/reorder - Reorder deal stages
+  app.put("/api/deal-stages/reorder", async (req, res) => {
+    try {
+      const { stages } = req.body;
+      
+      if (!Array.isArray(stages)) {
+        res.status(400).json({ error: "stages must be an array" });
+        return;
+      }
+      
+      await storage.reorderDealStages(stages);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error reordering deal stages:", error);
+      res.status(500).json({ error: "Failed to reorder deal stages" });
     }
   });
 

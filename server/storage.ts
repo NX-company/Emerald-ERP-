@@ -3,7 +3,9 @@ import {
   type UserWithPassword,
   type InsertUser, 
   type Deal, 
-  type InsertDeal, 
+  type InsertDeal,
+  type DealStage,
+  type InsertDealStage,
   type Project,
   type InsertProject,
   type ProjectStage,
@@ -26,7 +28,8 @@ import {
   type InsertDocument,
   type CompanySettings,
   type InsertCompanySettings,
-  deals, 
+  deals,
+  dealStages,
   users,
   projects,
   project_stages,
@@ -58,6 +61,16 @@ export interface IStorage {
   updateDeal(id: string, data: Partial<InsertDeal>): Promise<Deal | undefined>;
   deleteDeal(id: string): Promise<boolean>;
   getDealsByStage(stage: string): Promise<Deal[]>;
+  countDealsByStage(stage: string): Promise<number>;
+  updateDealsStage(oldStage: string, newStage: string): Promise<number>;
+
+  // Deal stage methods
+  getAllDealStages(): Promise<DealStage[]>;
+  getDealStageById(id: string): Promise<DealStage | undefined>;
+  createDealStage(data: InsertDealStage): Promise<DealStage>;
+  updateDealStage(id: string, data: Partial<InsertDealStage>): Promise<DealStage | undefined>;
+  deleteDealStage(id: string): Promise<boolean>;
+  reorderDealStages(stages: Array<{ id: string; order: number }>): Promise<void>;
 
   // Project methods
   getAllProjects(): Promise<Array<Project & { stages: ProjectStage[] }>>;
@@ -201,7 +214,59 @@ export class DbStorage implements IStorage {
   }
 
   async getDealsByStage(stage: string): Promise<Deal[]> {
-    return await db.select().from(deals).where(eq(deals.stage, stage as any));
+    return await db.select().from(deals).where(eq(deals.stage, stage));
+  }
+
+  async countDealsByStage(stage: string): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)::int` })
+      .from(deals)
+      .where(eq(deals.stage, stage));
+    return result[0]?.count || 0;
+  }
+
+  async updateDealsStage(oldStage: string, newStage: string): Promise<number> {
+    const result = await db.update(deals)
+      .set({ stage: newStage, updated_at: new Date() })
+      .where(eq(deals.stage, oldStage))
+      .returning();
+    return result.length;
+  }
+
+  async getAllDealStages(): Promise<DealStage[]> {
+    return await db.select().from(dealStages).orderBy(asc(dealStages.order));
+  }
+
+  async getDealStageById(id: string): Promise<DealStage | undefined> {
+    const result = await db.select().from(dealStages).where(eq(dealStages.id, id));
+    return result[0];
+  }
+
+  async createDealStage(data: InsertDealStage): Promise<DealStage> {
+    const result = await db.insert(dealStages).values(data).returning();
+    return result[0];
+  }
+
+  async updateDealStage(id: string, data: Partial<InsertDealStage>): Promise<DealStage | undefined> {
+    const result = await db.update(dealStages)
+      .set(data)
+      .where(eq(dealStages.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteDealStage(id: string): Promise<boolean> {
+    const result = await db.delete(dealStages).where(eq(dealStages.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async reorderDealStages(stages: Array<{ id: string; order: number }>): Promise<void> {
+    await Promise.all(
+      stages.map(stage =>
+        db.update(dealStages)
+          .set({ order: stage.order })
+          .where(eq(dealStages.id, stage.id))
+      )
+    );
   }
 
   // Project methods

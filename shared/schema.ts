@@ -33,12 +33,29 @@ export type InsertUser = z.infer<typeof insertUserSchema>;
 export type UserWithPassword = typeof users.$inferSelect;
 export type User = Omit<UserWithPassword, 'password'>;
 
+export const dealStages = pgTable("deal_stages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  key: text("key").notNull().unique(),
+  color: text("color").default("#6366f1"),
+  order: integer("order").notNull(),
+  created_at: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertDealStageSchema = createInsertSchema(dealStages).omit({
+  id: true,
+  created_at: true,
+});
+
+export type InsertDealStage = z.infer<typeof insertDealStageSchema>;
+export type DealStage = typeof dealStages.$inferSelect;
+
 export const deals = pgTable("deals", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   client_name: text("client_name").notNull(),
   company: text("company"),
   amount: numeric("amount", { precision: 12, scale: 2 }),
-  stage: dealStageEnum("stage").notNull().default("new"),
+  stage: text("stage").notNull().default("new"),
   deadline: timestamp("deadline"),
   manager_id: varchar("manager_id").references(() => users.id),
   tags: text("tags").array(),

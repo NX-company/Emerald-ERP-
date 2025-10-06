@@ -2,14 +2,15 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, LayoutGrid, List } from "lucide-react";
+import { Plus, LayoutGrid, List, Settings } from "lucide-react";
 import { KanbanBoard } from "@/components/KanbanBoard";
 import { DealCard } from "@/components/DealCard";
 import { DealDetailSheet } from "@/components/DealDetailSheet";
 import { DealCreateDialog } from "@/components/DealCreateDialog";
+import { ManageStagesDialog } from "@/components/ManageStagesDialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import type { Deal, User } from "@shared/schema";
+import type { Deal, User, DealStage } from "@shared/schema";
 import { DragStartEvent, DragOverEvent, DragEndEvent } from "@dnd-kit/core";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
@@ -18,6 +19,7 @@ export default function Sales() {
   const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null);
   const [isDetailSheetOpen, setIsDetailSheetOpen] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isManageStagesOpen, setIsManageStagesOpen] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const { toast } = useToast();
 
@@ -29,6 +31,10 @@ export default function Sales() {
     queryKey: ["/api/users"],
   });
 
+  const { data: stages = [], isLoading: stagesLoading } = useQuery<DealStage[]>({
+    queryKey: ["/api/deal-stages"],
+  });
+
   if (dealsError) {
     toast({
       title: "Ошибка загрузки",
@@ -37,7 +43,7 @@ export default function Sales() {
     });
   }
 
-  const isLoading = dealsLoading || usersLoading;
+  const isLoading = dealsLoading || usersLoading || stagesLoading;
 
   const getUserName = (userId: string | null) => {
     if (!userId) return "Не назначен";
@@ -115,8 +121,8 @@ export default function Sales() {
       return;
     }
 
-    const columns = ["new", "meeting", "proposal", "contract", "won", "lost"];
-    const newStage = columns.find(col => overId === col || deals.find(d => d.id === overId && d.stage === col));
+    const stageKeys = stages.map(s => s.key);
+    const newStage = stageKeys.find(key => overId === key || deals.find(d => d.id === overId && d.stage === key));
 
     if (newStage && newStage !== activeDeal.stage) {
       const previousDeals = [...deals];
@@ -124,7 +130,7 @@ export default function Sales() {
       queryClient.setQueryData(["/api/deals"], (oldDeals: Deal[] | undefined) => {
         if (!oldDeals) return oldDeals;
         return oldDeals.map(deal => 
-          deal.id === activeId ? { ...deal, stage: newStage as any } : deal
+          deal.id === activeId ? { ...deal, stage: newStage } : deal
         );
       });
 
@@ -143,74 +149,17 @@ export default function Sales() {
 
   const activeDeal = activeId ? transformedDeals.find(d => d.id === activeId) : null;
 
-  const kanbanColumns = [
-    {
-      id: "new",
-      title: "Новые",
-      count: transformedDeals.filter((d) => d.stage === "new").length,
-      items: transformedDeals
-        .filter((d) => d.stage === "new")
-        .map((deal) => ({
-          id: deal.id,
-          content: <DealCard key={deal.id} {...deal} onClick={() => handleDealClick(deal.id)} />
-        })),
-    },
-    {
-      id: "meeting",
-      title: "Встреча назначена",
-      count: transformedDeals.filter((d) => d.stage === "meeting").length,
-      items: transformedDeals
-        .filter((d) => d.stage === "meeting")
-        .map((deal) => ({
-          id: deal.id,
-          content: <DealCard key={deal.id} {...deal} onClick={() => handleDealClick(deal.id)} />
-        })),
-    },
-    {
-      id: "proposal",
-      title: "КП отправлено",
-      count: transformedDeals.filter((d) => d.stage === "proposal").length,
-      items: transformedDeals
-        .filter((d) => d.stage === "proposal")
-        .map((deal) => ({
-          id: deal.id,
-          content: <DealCard key={deal.id} {...deal} onClick={() => handleDealClick(deal.id)} />
-        })),
-    },
-    {
-      id: "contract",
-      title: "Договор",
-      count: transformedDeals.filter((d) => d.stage === "contract").length,
-      items: transformedDeals
-        .filter((d) => d.stage === "contract")
-        .map((deal) => ({
-          id: deal.id,
-          content: <DealCard key={deal.id} {...deal} onClick={() => handleDealClick(deal.id)} />
-        })),
-    },
-    {
-      id: "won",
-      title: "Выиграно",
-      count: transformedDeals.filter((d) => d.stage === "won").length,
-      items: transformedDeals
-        .filter((d) => d.stage === "won")
-        .map((deal) => ({
-          id: deal.id,
-          content: <DealCard key={deal.id} {...deal} onClick={() => handleDealClick(deal.id)} />
-        })),
-    },
-    {
-      id: "lost",
-      title: "Проиграно",
-      count: transformedDeals.filter((d) => d.stage === "lost").length,
-      items: transformedDeals
-        .filter((d) => d.stage === "lost")
-        .map((deal) => ({
-          id: deal.id,
-          content: <DealCard key={deal.id} {...deal} onClick={() => handleDealClick(deal.id)} />
-        })),
-    },
-  ];
+  const kanbanColumns = stages.map(stage => ({
+    id: stage.key,
+    title: stage.name,
+    count: transformedDeals.filter((d) => d.stage === stage.key).length,
+    items: transformedDeals
+      .filter((d) => d.stage === stage.key)
+      .map((deal) => ({
+        id: deal.id,
+        content: <DealCard key={deal.id} {...deal} onClick={() => handleDealClick(deal.id)} />
+      })),
+  }));
 
   return (
     <div className="space-y-6">
@@ -230,6 +179,14 @@ export default function Sales() {
               </TabsTrigger>
             </TabsList>
           </Tabs>
+          <Button 
+            variant="outline" 
+            onClick={() => setIsManageStagesOpen(true)} 
+            data-testid="button-manage-stages"
+          >
+            <Settings className="h-4 w-4 mr-2" />
+            Управление этапами
+          </Button>
           <Button onClick={() => setIsCreateDialogOpen(true)} data-testid="button-create-deal">
             <Plus className="h-4 w-4 mr-2" />
             Новая сделка
@@ -269,6 +226,11 @@ export default function Sales() {
       <DealCreateDialog
         open={isCreateDialogOpen}
         onOpenChange={setIsCreateDialogOpen}
+      />
+
+      <ManageStagesDialog
+        open={isManageStagesOpen}
+        onOpenChange={setIsManageStagesOpen}
       />
     </div>
   );
