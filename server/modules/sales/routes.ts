@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { salesRepository } from "./repository";
-import { insertDealSchema, insertDealStageSchema } from "@shared/schema";
+import { insertDealSchema, insertDealStageSchema, insertDealMessageSchema } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
 
 export const router = Router();
@@ -261,5 +261,43 @@ router.put("/api/deal-stages/reorder", async (req, res) => {
   } catch (error) {
     console.error("Error reordering deal stages:", error);
     res.status(500).json({ error: "Failed to reorder deal stages" });
+  }
+});
+
+// ========== Deal Messages Endpoints ==========
+
+// GET /api/deals/:id/messages - получить все сообщения по сделке
+router.get("/api/deals/:id/messages", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const messages = await salesRepository.getDealMessages(id);
+    res.json(messages);
+  } catch (error) {
+    console.error("Error fetching deal messages:", error);
+    res.status(500).json({ error: "Failed to fetch messages" });
+  }
+});
+
+// POST /api/deals/:id/messages - создать новое сообщение
+router.post("/api/deals/:id/messages", async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const validationResult = insertDealMessageSchema.safeParse({
+      ...req.body,
+      deal_id: id
+    });
+    
+    if (!validationResult.success) {
+      const errorMessage = fromZodError(validationResult.error).toString();
+      res.status(400).json({ error: errorMessage });
+      return;
+    }
+    
+    const newMessage = await salesRepository.createDealMessage(validationResult.data);
+    res.status(201).json(newMessage);
+  } catch (error) {
+    console.error("Error creating deal message:", error);
+    res.status(500).json({ error: "Failed to create message" });
   }
 });

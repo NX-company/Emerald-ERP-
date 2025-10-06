@@ -1,7 +1,7 @@
 import { db } from "../../db";
-import { eq, asc, sql } from "drizzle-orm";
-import type { Deal, InsertDeal, DealStage, InsertDealStage } from "@shared/schema";
-import { deals, dealStages } from "@shared/schema";
+import { eq, asc, desc, sql } from "drizzle-orm";
+import type { Deal, InsertDeal, DealStage, InsertDealStage, DealMessage, InsertDealMessage } from "@shared/schema";
+import { deals, dealStages, deal_messages } from "@shared/schema";
 
 export class SalesRepository {
   async getAllDeals(): Promise<Deal[]> {
@@ -85,6 +85,22 @@ export class SalesRepository {
           .where(eq(dealStages.id, stage.id))
       )
     );
+  }
+
+  async getDealMessages(dealId: string): Promise<DealMessage[]> {
+    return await db
+      .select()
+      .from(deal_messages)
+      .where(eq(deal_messages.deal_id, dealId))
+      .orderBy(desc(deal_messages.created_at));
+  }
+
+  async createDealMessage(data: InsertDealMessage): Promise<DealMessage> {
+    const [message] = await db
+      .insert(deal_messages)
+      .values(data)
+      .returning();
+    return message;
   }
 }
 
