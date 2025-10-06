@@ -14,17 +14,17 @@ import { router as usersRouter } from "./modules/users/routes";
 import { router as settingsRouter } from "./modules/settings/routes";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Register all modular routes
-  app.use("/api", salesRouter);
-  app.use("/api", projectsRouter);
-  app.use("/api", productionRouter);
-  app.use("/api", warehouseRouter);
-  app.use("/api", financeRouter);
-  app.use("/api", installationRouter);
-  app.use("/api", tasksRouter);
-  app.use("/api", documentsRouter);
-  app.use("/api", usersRouter);
-  app.use("/api", settingsRouter);
+  // Register all modular routes (они уже содержат префикс /api)
+  app.use(salesRouter);
+  app.use(projectsRouter);
+  app.use(productionRouter);
+  app.use(warehouseRouter);
+  app.use(financeRouter);
+  app.use(installationRouter);
+  app.use(tasksRouter);
+  app.use(documentsRouter);
+  app.use(usersRouter);
+  app.use(settingsRouter);
 
   const httpServer = createServer(app);
 
