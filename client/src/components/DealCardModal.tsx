@@ -1,10 +1,16 @@
+import { useState } from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
-import { Mail, Phone, Building2, DollarSign } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
-import type { Deal } from "@shared/schema";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Mail, Phone, Building2, DollarSign, MessageSquare, CheckSquare, Activity } from "lucide-react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { formatDistanceToNow } from "date-fns";
+import { ru } from "date-fns/locale";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import type { Deal, DealMessage, InsertDealMessage } from "@shared/schema";
 
 interface DealCardModalProps {
   dealId: string | null;
@@ -17,6 +23,45 @@ export function DealCardModal({ dealId, open, onOpenChange }: DealCardModalProps
     queryKey: ['/api/deals', dealId],
     enabled: !!dealId && open,
   });
+
+  const { data: messages = [], isLoading: messagesLoading } = useQuery<DealMessage[]>({
+    queryKey: ['/api/deals', dealId, 'messages'],
+    enabled: !!dealId && open,
+  });
+
+  const [messageText, setMessageText] = useState("");
+  const [messageType, setMessageType] = useState<"note" | "call" | "email" | "task">("note");
+
+  const createMessage = useMutation({
+    mutationFn: async (data: { message_type: "note" | "call" | "email" | "task"; content: string }) => {
+      return await apiRequest(`/api/deals/${dealId}/messages`, 'POST', {
+        ...data,
+        author_id: "c2fdd40b-dadf-4fbb-848a-74283d14802e"
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/deals', dealId, 'messages'] });
+      setMessageText("");
+    },
+  });
+
+  const handleSendMessage = () => {
+    if (!messageText.trim()) return;
+    createMessage.mutate({
+      message_type: messageType,
+      content: messageText,
+    });
+  };
+
+  const getMessageIcon = (type: string) => {
+    switch (type) {
+      case 'call': return <Phone className="w-4 h-4" />;
+      case 'email': return <Mail className="w-4 h-4" />;
+      case 'task': return <CheckSquare className="w-4 h-4" />;
+      case 'status_change': return <Activity className="w-4 h-4" />;
+      default: return <MessageSquare className="w-4 h-4" />;
+    }
+  };
 
   if (!open || !dealId) return null;
 
@@ -112,10 +157,62 @@ export function DealCardModal({ dealId, open, onOpenChange }: DealCardModalProps
             </div>
 
             {/* Центральная панель - чат */}
-            <div className="flex flex-col" data-testid="panel-center-chat">
-              <div className="flex-1 p-4 overflow-y-auto">
-                <h3 className="font-semibold mb-2">История сообщений</h3>
-                {/* Заглушка */}
+            <div className="flex flex-col h-full" data-testid="panel-center-chat">
+              {/* История */}
+              <div className="flex-1 p-4 overflow-y-auto" data-testid="list-messages">
+                <h3 className="font-semibold mb-4">История сообщений</h3>
+                {messagesLoading ? (
+                  <p className="text-sm text-muted-foreground">Загрузка...</p>
+                ) : messages.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">История пуста. Добавьте первое сообщение</p>
+                ) : (
+                  <div className="space-y-3">
+                    {[...messages].reverse().map((msg) => (
+                      <div key={msg.id} className="flex gap-3" data-testid={`message-${msg.id}`}>
+                        <div className="text-muted-foreground mt-1">
+                          {getMessageIcon(msg.message_type)}
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm">{msg.content}</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {formatDistanceToNow(new Date(msg.created_at), { addSuffix: true, locale: ru })}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Форма */}
+              <div className="border-t p-4" data-testid="form-new-message">
+                <div className="flex gap-2 mb-2">
+                  <Select value={messageType} onValueChange={(v) => setMessageType(v as any)}>
+                    <SelectTrigger className="w-[150px]" data-testid="select-message-type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="note">Заметка</SelectItem>
+                      <SelectItem value="call">Звонок</SelectItem>
+                      <SelectItem value="email">Email</SelectItem>
+                      <SelectItem value="task">Задача</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Textarea
+                  placeholder="Добавьте сообщение..."
+                  value={messageText}
+                  onChange={(e) => setMessageText(e.target.value)}
+                  className="mb-2"
+                  data-testid="input-message"
+                />
+                <Button 
+                  onClick={handleSendMessage}
+                  disabled={!messageText.trim() || createMessage.isPending}
+                  data-testid="button-send-message"
+                >
+                  {createMessage.isPending ? "Отправка..." : "Отправить"}
+                </Button>
               </div>
             </div>
 
