@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,13 +23,15 @@ export default function Settings() {
     queryKey: ["/api/settings/company"],
   });
 
-  if (usersError || settingsError) {
-    toast({
-      title: "Ошибка загрузки",
-      description: "Не удалось загрузить настройки",
-      variant: "destructive",
-    });
-  }
+  useEffect(() => {
+    if (usersError || settingsError) {
+      toast({
+        title: "Ошибка загрузки",
+        description: "Не удалось загрузить настройки",
+        variant: "destructive",
+      });
+    }
+  }, [usersError, settingsError, toast]);
 
   const roles = [
     "Директор",

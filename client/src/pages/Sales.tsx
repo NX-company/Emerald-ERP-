@@ -11,6 +11,7 @@ import type { Deal, User } from "@shared/schema";
 
 export default function Sales() {
   const [view, setView] = useState<"kanban" | "list">("kanban");
+  const [selectedDeal, setSelectedDeal] = useState<string | null>(null);
   const { toast } = useToast();
 
   const { data: deals = [], isLoading: dealsLoading, error: dealsError } = useQuery<Deal[]>({
@@ -57,6 +58,14 @@ export default function Sales() {
     stage: deal.stage,
   }));
 
+  const handleDealClick = (dealId: string) => {
+    setSelectedDeal(dealId);
+    toast({
+      title: "Просмотр заказа",
+      description: `Открытие карточки заказа #${dealId.substring(0, 8)}...`,
+    });
+  };
+
   const kanbanColumns = [
     {
       id: "new",
@@ -64,7 +73,7 @@ export default function Sales() {
       count: transformedDeals.filter((d) => d.stage === "new").length,
       items: transformedDeals
         .filter((d) => d.stage === "new")
-        .map((deal) => <DealCard key={deal.id} {...deal} />),
+        .map((deal) => <DealCard key={deal.id} {...deal} onClick={() => handleDealClick(deal.id)} />),
     },
     {
       id: "meeting",
@@ -72,7 +81,7 @@ export default function Sales() {
       count: transformedDeals.filter((d) => d.stage === "meeting").length,
       items: transformedDeals
         .filter((d) => d.stage === "meeting")
-        .map((deal) => <DealCard key={deal.id} {...deal} />),
+        .map((deal) => <DealCard key={deal.id} {...deal} onClick={() => handleDealClick(deal.id)} />),
     },
     {
       id: "proposal",
@@ -80,7 +89,7 @@ export default function Sales() {
       count: transformedDeals.filter((d) => d.stage === "proposal").length,
       items: transformedDeals
         .filter((d) => d.stage === "proposal")
-        .map((deal) => <DealCard key={deal.id} {...deal} />),
+        .map((deal) => <DealCard key={deal.id} {...deal} onClick={() => handleDealClick(deal.id)} />),
     },
     {
       id: "contract",
@@ -88,7 +97,7 @@ export default function Sales() {
       count: transformedDeals.filter((d) => d.stage === "contract").length,
       items: transformedDeals
         .filter((d) => d.stage === "contract")
-        .map((deal) => <DealCard key={deal.id} {...deal} />),
+        .map((deal) => <DealCard key={deal.id} {...deal} onClick={() => handleDealClick(deal.id)} />),
     },
   ];
 
@@ -128,7 +137,7 @@ export default function Sales() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {transformedDeals.map((deal) => (
-            <DealCard key={deal.id} {...deal} />
+            <DealCard key={deal.id} {...deal} onClick={() => handleDealClick(deal.id)} />
           ))}
         </div>
       )}

@@ -11,11 +11,12 @@ interface DealCardProps {
   deadline: string;
   manager: string;
   tags?: string[];
+  onClick?: () => void;
 }
 
-export function DealCard({ id, clientName, company, amount, deadline, manager, tags = [] }: DealCardProps) {
+export function DealCard({ id, clientName, company, amount, deadline, manager, tags = [], onClick }: DealCardProps) {
   return (
-    <Card className="hover-elevate active-elevate-2 cursor-pointer" data-testid={`card-deal-${id}`}>
+    <Card className="hover-elevate active-elevate-2 cursor-pointer" data-testid={`card-deal-${id}`} onClick={onClick}>
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
