@@ -8,6 +8,7 @@ import { DealCard } from "@/components/DealCard";
 import { DealDetailSheet } from "@/components/DealDetailSheet";
 import { DealCreateDialog } from "@/components/DealCreateDialog";
 import { ManageStagesDialog } from "@/components/ManageStagesDialog";
+import { DealCardModal } from "@/components/DealCardModal";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import type { Deal, User, DealStage } from "@shared/schema";
@@ -21,6 +22,8 @@ export default function Sales() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isManageStagesOpen, setIsManageStagesOpen] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [selectedDealId, setSelectedDealId] = useState<string | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
   const { toast } = useToast();
 
   const { data: deals = [], isLoading: dealsLoading, error: dealsError } = useQuery<Deal[]>({
@@ -89,11 +92,8 @@ export default function Sales() {
   });
 
   const handleDealClick = (dealId: string) => {
-    const deal = deals.find(d => d.id === dealId);
-    if (deal) {
-      setSelectedDeal(deal);
-      setIsDetailSheetOpen(true);
-    }
+    setSelectedDealId(dealId);
+    setModalOpen(true);
   };
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -232,6 +232,12 @@ export default function Sales() {
       <ManageStagesDialog
         open={isManageStagesOpen}
         onOpenChange={setIsManageStagesOpen}
+      />
+
+      <DealCardModal 
+        dealId={selectedDealId}
+        open={modalOpen}
+        onOpenChange={setModalOpen}
       />
     </div>
   );
