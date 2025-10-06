@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, pgEnum, numeric, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, pgEnum, numeric, boolean, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -330,6 +330,7 @@ export const deal_documents = pgTable("deal_documents", {
   name: text("name").notNull(),
   version: integer("version").default(1),
   file_url: text("file_url").notNull(),
+  data: jsonb("data"),
   total_amount: numeric("total_amount", { precision: 12, scale: 2 }),
   is_signed: boolean("is_signed").default(false),
   parent_id: varchar("parent_id").references((): any => deal_documents.id),

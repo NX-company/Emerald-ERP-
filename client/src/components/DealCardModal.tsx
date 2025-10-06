@@ -10,6 +10,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { DocumentFormDialog } from "@/components/DocumentFormDialog";
 import type { Deal, DealMessage, InsertDealMessage, DealDocument } from "@shared/schema";
 
 interface DealCardModalProps {
@@ -36,6 +37,10 @@ export function DealCardModal({ dealId, open, onOpenChange }: DealCardModalProps
 
   const [messageText, setMessageText] = useState("");
   const [messageType, setMessageType] = useState<"note" | "call" | "email" | "task">("note");
+  
+  const [quoteDialogOpen, setQuoteDialogOpen] = useState(false);
+  const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
+  const [contractDialogOpen, setContractDialogOpen] = useState(false);
 
   // Логика воркфлоу
   const hasQuote = documents.some(doc => doc.document_type === 'quote');
@@ -249,6 +254,7 @@ export function DealCardModal({ dealId, open, onOpenChange }: DealCardModalProps
 
                 <Button 
                   className="w-full justify-start gap-2"
+                  onClick={() => setQuoteDialogOpen(true)}
                   data-testid="button-create-quote"
                 >
                   <Plus className="w-4 h-4" />
@@ -260,6 +266,7 @@ export function DealCardModal({ dealId, open, onOpenChange }: DealCardModalProps
                     <Button 
                       variant="outline"
                       className="w-full justify-start gap-2"
+                      onClick={() => setInvoiceDialogOpen(true)}
                       data-testid="button-create-invoice"
                     >
                       <FileText className="w-4 h-4" />
@@ -269,6 +276,7 @@ export function DealCardModal({ dealId, open, onOpenChange }: DealCardModalProps
                     <Button 
                       variant="outline"
                       className="w-full justify-start gap-2"
+                      onClick={() => setContractDialogOpen(true)}
                       data-testid="button-create-contract"
                     >
                       <FileText className="w-4 h-4" />
@@ -348,6 +356,36 @@ export function DealCardModal({ dealId, open, onOpenChange }: DealCardModalProps
           </div>
         )}
       </DialogContent>
+
+      <DocumentFormDialog
+        open={quoteDialogOpen}
+        onOpenChange={setQuoteDialogOpen}
+        dealId={dealId}
+        documentType="quote"
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ['/api/deals', dealId, 'documents'] });
+        }}
+      />
+
+      <DocumentFormDialog
+        open={invoiceDialogOpen}
+        onOpenChange={setInvoiceDialogOpen}
+        dealId={dealId}
+        documentType="invoice"
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ['/api/deals', dealId, 'documents'] });
+        }}
+      />
+
+      <DocumentFormDialog
+        open={contractDialogOpen}
+        onOpenChange={setContractDialogOpen}
+        dealId={dealId}
+        documentType="contract"
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ['/api/deals', dealId, 'documents'] });
+        }}
+      />
     </Dialog>
   );
 }
