@@ -30,15 +30,37 @@ Preferred communication style: Simple, everyday language.
 
 **Runtime & Framework**: Node.js with Express.js server using ES modules (type: "module"). The server handles both API routes and serves the Vite-built frontend in production.
 
-**API Design**: RESTful API with routes organized by domain (deals, projects, production, warehouse, finance, installations, tasks, documents, users, settings). Endpoints follow standard HTTP methods (GET, POST, PUT, DELETE) with JSON request/response bodies.
+**Modular Architecture** (Октябрь 2025): Backend организован в виде 10 независимых модулей в `server/modules/`, каждый модуль содержит:
+- `routes.ts` - API эндпоинты модуля
+- `repository.ts` - работа с базой данных (Drizzle ORM)
+- `service.ts` - бизнес-логика (заготовка для будущего развития)
 
-**Database Layer**: Drizzle ORM for type-safe database queries with PostgreSQL as the database (via Neon serverless). Schema definitions in `shared/schema.ts` use Drizzle's schema builder with automatic TypeScript type inference. Database migrations managed via drizzle-kit.
+**10 Модулей**:
+1. **Sales** (`/api/deals`) - управление сделками и клиентами
+2. **Projects** (`/api/projects`) - управление проектами и этапами
+3. **Production** (`/api/production`) - производственные заказы
+4. **Warehouse** (`/api/warehouse`) - складской учет
+5. **Finance** (`/api/finance/transactions`) - финансовые операции
+6. **Installation** (`/api/installations`) - установка и монтаж
+7. **Tasks** (`/api/tasks`) - задачи и поручения
+8. **Documents** (`/api/documents`) - документооборот
+9. **Users** (`/api/users`) - пользователи системы
+10. **Settings** (`/api/settings/company`) - настройки компании
 
-**Data Validation**: Zod schemas (via drizzle-zod's createInsertSchema) validate incoming data at API boundaries, with validation errors transformed to user-friendly messages using zod-validation-error.
+**Принципы модульной архитектуры**:
+- Каждый модуль полностью независим (нет cross-module imports)
+- Модули можно разрабатывать параллельно без конфликтов
+- Простая масштабируемость - легко добавлять новые модули
+- `server/routes.ts` (33 строки) - только монтирование модульных роутеров
+- `server/storage.ts` (12 строк) - экспорт модульных репозиториев
 
-**Authentication**: Bcrypt for password hashing. Session management is likely handled via connect-pg-simple for PostgreSQL-backed sessions (dependency present but implementation not shown in provided files).
+**API Design**: RESTful API с routes, организованными по модулям. Эндпоинты следуют стандартным HTTP методам (GET, POST, PUT, DELETE) с JSON request/response.
 
-**Business Logic**: Storage layer pattern (`server/storage.ts`) abstracts database operations from route handlers, providing a clean interface for CRUD operations on each entity type.
+**Database Layer**: Drizzle ORM для type-safe запросов к PostgreSQL (via Neon serverless). Схемы в `shared/schema.ts`, миграции через drizzle-kit.
+
+**Data Validation**: Zod schemas (via drizzle-zod's createInsertSchema) валидируют данные на границах API, ошибки преобразуются в понятные сообщения через zod-validation-error.
+
+**Authentication**: Bcrypt для хеширования паролей. Session management через connect-pg-simple для PostgreSQL-backed sessions.
 
 ### Data Storage
 
