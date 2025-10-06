@@ -67,12 +67,13 @@ export default function Sales() {
 
   const transformedDeals = deals.map(deal => ({
     id: deal.id,
+    orderNumber: deal.order_number || undefined,
     clientName: deal.client_name,
-    company: deal.company || "",
+    company: deal.company || undefined,
     amount: parseFloat(deal.amount || "0"),
     deadline: formatDate(deal.deadline),
     manager: getUserName(deal.manager_id),
-    tags: [],
+    tags: deal.tags || [],
     stage: deal.stage,
   }));
 

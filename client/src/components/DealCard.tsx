@@ -5,8 +5,9 @@ import { UserAvatar } from "./UserAvatar";
 
 interface DealCardProps {
   id: string;
+  orderNumber?: string;
   clientName: string;
-  company: string;
+  company?: string;
   amount: number;
   deadline: string;
   manager: string;
@@ -14,19 +15,21 @@ interface DealCardProps {
   onClick?: () => void;
 }
 
-export function DealCard({ id, clientName, company, amount, deadline, manager, tags = [], onClick }: DealCardProps) {
+export function DealCard({ id, orderNumber, clientName, company, amount, deadline, manager, tags = [], onClick }: DealCardProps) {
   return (
     <Card className="hover-elevate active-elevate-2 cursor-pointer" data-testid={`card-deal-${id}`} onClick={onClick}>
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
             <h3 className="font-semibold text-sm truncate">{clientName}</h3>
-            <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
-              <Building2 className="h-3 w-3" />
-              <span className="truncate">{company}</span>
-            </div>
+            {company && (
+              <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
+                <Building2 className="h-3 w-3" />
+                <span className="truncate">{company}</span>
+              </div>
+            )}
           </div>
-          <Badge variant="outline" className="text-xs font-mono">#{id}</Badge>
+          <Badge variant="outline" className="text-xs font-mono">#{orderNumber || id}</Badge>
         </div>
       </CardHeader>
       <CardContent className="space-y-3">

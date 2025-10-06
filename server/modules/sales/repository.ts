@@ -13,7 +13,21 @@ export class SalesRepository {
     return result[0];
   }
 
+  async getNextOrderNumber(): Promise<string> {
+    const result = await db.select({ 
+      maxOrderNumber: sql<string>`COALESCE(MAX(CAST(order_number AS INTEGER)), 0)` 
+    })
+    .from(deals)
+    .where(sql`order_number ~ '^[0-9]+$'`);
+    
+    const maxNumber = parseInt(result[0]?.maxOrderNumber || "0");
+    return String(maxNumber + 1);
+  }
+
   async createDeal(data: InsertDeal): Promise<Deal> {
+    if (!data.order_number) {
+      data.order_number = await this.getNextOrderNumber();
+    }
     const result = await db.insert(deals).values(data).returning();
     return result[0];
   }
