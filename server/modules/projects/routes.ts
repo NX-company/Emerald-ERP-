@@ -1,6 +1,5 @@
 import { Router } from "express";
 import { projectsRepository } from "./repository";
-import { salesRepository } from "../sales/repository";
 import { insertProjectSchema, insertProjectStageSchema } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
 
@@ -53,14 +52,6 @@ router.post("/api/projects", async (req, res) => {
       return;
     }
     
-    if (validationResult.data.deal_id) {
-      const deal = await salesRepository.getDealById(validationResult.data.deal_id);
-      if (!deal) {
-        res.status(400).json({ error: "Deal not found" });
-        return;
-      }
-    }
-    
     const newProject = await projectsRepository.createProject(validationResult.data);
     res.status(201).json(newProject);
   } catch (error) {
@@ -80,14 +71,6 @@ router.put("/api/projects/:id", async (req, res) => {
       const errorMessage = fromZodError(validationResult.error).toString();
       res.status(400).json({ error: errorMessage });
       return;
-    }
-    
-    if (validationResult.data.deal_id) {
-      const deal = await salesRepository.getDealById(validationResult.data.deal_id);
-      if (!deal) {
-        res.status(400).json({ error: "Deal not found" });
-        return;
-      }
     }
     
     const updatedProject = await projectsRepository.updateProject(id, validationResult.data);
