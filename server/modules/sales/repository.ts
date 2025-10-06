@@ -1,5 +1,5 @@
 import { db } from "../../db";
-import { eq, asc, desc, sql } from "drizzle-orm";
+import { eq, asc, desc, sql, inArray } from "drizzle-orm";
 import type { Deal, InsertDeal, DealStage, InsertDealStage, DealMessage, InsertDealMessage, DealDocument, InsertDealDocument } from "@shared/schema";
 import { deals, dealStages, deal_messages, deal_documents } from "@shared/schema";
 
@@ -43,6 +43,14 @@ export class SalesRepository {
   async deleteDeal(id: string): Promise<boolean> {
     const result = await db.delete(deals).where(eq(deals.id, id)).returning();
     return result.length > 0;
+  }
+
+  async bulkDeleteDeals(ids: string[]): Promise<number> {
+    if (ids.length === 0) {
+      return 0;
+    }
+    const result = await db.delete(deals).where(inArray(deals.id, ids)).returning();
+    return result.length;
   }
 
   async getDealsByStage(stage: string): Promise<Deal[]> {

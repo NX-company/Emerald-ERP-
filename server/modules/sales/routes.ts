@@ -2,6 +2,7 @@ import { Router } from "express";
 import { salesRepository } from "./repository";
 import { insertDealSchema, insertDealStageSchema, insertDealMessageSchema, insertDealDocumentSchema } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
+import { checkPermission } from "../../middleware/permissions";
 
 export const router = Router();
 
@@ -71,7 +72,7 @@ router.get("/api/deals/:id", async (req, res) => {
 });
 
 // POST /api/deals - Create new deal
-router.post("/api/deals", async (req, res) => {
+router.post("/api/deals", checkPermission("can_create_deals"), async (req, res) => {
   try {
     const validationResult = insertDealSchema.safeParse(req.body);
     
@@ -90,7 +91,7 @@ router.post("/api/deals", async (req, res) => {
 });
 
 // PUT /api/deals/:id - Update deal
-router.put("/api/deals/:id", async (req, res) => {
+router.put("/api/deals/:id", checkPermission("can_edit_deals"), async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -118,7 +119,7 @@ router.put("/api/deals/:id", async (req, res) => {
 });
 
 // DELETE /api/deals/:id - Delete deal
-router.delete("/api/deals/:id", async (req, res) => {
+router.delete("/api/deals/:id", checkPermission("can_delete_deals"), async (req, res) => {
   try {
     const { id } = req.params;
     const deleted = await salesRepository.deleteDeal(id);
@@ -132,6 +133,24 @@ router.delete("/api/deals/:id", async (req, res) => {
   } catch (error) {
     console.error("Error deleting deal:", error);
     res.status(500).json({ error: "Failed to delete deal" });
+  }
+});
+
+// POST /api/deals/bulk-delete - Bulk delete deals
+router.post("/api/deals/bulk-delete", checkPermission("can_delete_deals"), async (req, res) => {
+  try {
+    const { dealIds } = req.body;
+    
+    if (!Array.isArray(dealIds) || dealIds.length === 0) {
+      res.status(400).json({ error: "dealIds must be a non-empty array" });
+      return;
+    }
+    
+    const deletedCount = await salesRepository.bulkDeleteDeals(dealIds);
+    res.json({ deletedCount, message: `Удалено ${deletedCount} сделок` });
+  } catch (error) {
+    console.error("Error bulk deleting deals:", error);
+    res.status(500).json({ error: "Failed to bulk delete deals" });
   }
 });
 

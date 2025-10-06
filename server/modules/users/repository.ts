@@ -58,6 +58,23 @@ export class UsersRepository {
     const result = await db.delete(users).where(eq(users.id, id)).returning();
     return result.length > 0;
   }
+
+  async updateUserPermissions(
+    id: string, 
+    permissions: {
+      can_create_deals?: boolean;
+      can_edit_deals?: boolean;
+      can_delete_deals?: boolean;
+    }
+  ): Promise<User | undefined> {
+    const result = await db.update(users)
+      .set(permissions)
+      .where(eq(users.id, id))
+      .returning();
+    if (!result[0]) return undefined;
+    const { password, ...userWithoutPassword } = result[0];
+    return userWithoutPassword;
+  }
 }
 
 export const usersRepository = new UsersRepository();

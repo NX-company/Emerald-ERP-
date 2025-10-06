@@ -82,3 +82,33 @@ router.delete("/api/users/:id", async (req, res) => {
     res.status(500).json({ error: "Failed to delete user" });
   }
 });
+
+// PUT /api/users/:id/permissions - Update user permissions
+router.put("/api/users/:id/permissions", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { can_create_deals, can_edit_deals, can_delete_deals } = req.body;
+    
+    const permissions: any = {};
+    if (typeof can_create_deals === "boolean") permissions.can_create_deals = can_create_deals;
+    if (typeof can_edit_deals === "boolean") permissions.can_edit_deals = can_edit_deals;
+    if (typeof can_delete_deals === "boolean") permissions.can_delete_deals = can_delete_deals;
+    
+    if (Object.keys(permissions).length === 0) {
+      res.status(400).json({ error: "No valid permissions provided" });
+      return;
+    }
+    
+    const updatedUser = await usersRepository.updateUserPermissions(id, permissions);
+    
+    if (!updatedUser) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+    
+    res.json(updatedUser);
+  } catch (error) {
+    console.error("Error updating user permissions:", error);
+    res.status(500).json({ error: "Failed to update user permissions" });
+  }
+});
