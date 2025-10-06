@@ -13,7 +13,7 @@ import type { Deal, User } from "@shared/schema";
 
 export default function Sales() {
   const [view, setView] = useState<"kanban" | "list">("kanban");
-  const [selectedDealId, setSelectedDealId] = useState<string | null>(null);
+  const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null);
   const [isDetailSheetOpen, setIsDetailSheetOpen] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const { toast } = useToast();
@@ -63,8 +63,11 @@ export default function Sales() {
   }));
 
   const handleDealClick = (dealId: string) => {
-    setSelectedDealId(dealId);
-    setIsDetailSheetOpen(true);
+    const deal = deals.find(d => d.id === dealId);
+    if (deal) {
+      setSelectedDeal(deal);
+      setIsDetailSheetOpen(true);
+    }
   };
 
   const kanbanColumns = [
@@ -120,7 +123,7 @@ export default function Sales() {
               </TabsTrigger>
             </TabsList>
           </Tabs>
-          <Button data-testid="button-create-deal">
+          <Button onClick={() => setIsCreateDialogOpen(true)} data-testid="button-create-deal">
             <Plus className="h-4 w-4 mr-2" />
             Новая сделка
           </Button>
@@ -142,6 +145,17 @@ export default function Sales() {
           ))}
         </div>
       )}
+
+      <DealDetailSheet
+        deal={selectedDeal}
+        open={isDetailSheetOpen}
+        onOpenChange={setIsDetailSheetOpen}
+      />
+
+      <DealCreateDialog
+        open={isCreateDialogOpen}
+        onOpenChange={setIsCreateDialogOpen}
+      />
     </div>
   );
 }

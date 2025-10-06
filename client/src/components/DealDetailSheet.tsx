@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -69,6 +69,20 @@ export function DealDetailSheet({ deal, open, onOpenChange }: DealDetailSheetPro
       tags: deal?.tags || [],
     },
   });
+
+  useEffect(() => {
+    if (deal) {
+      form.reset({
+        client_name: deal.client_name || "",
+        company: deal.company || "",
+        amount: deal.amount || "",
+        stage: deal.stage || "new",
+        deadline: deal.deadline ? new Date(deal.deadline).toISOString().slice(0, 16) : "",
+        manager_id: deal.manager_id || "",
+        tags: deal.tags || [],
+      });
+    }
+  }, [deal, form]);
 
   const updateMutation = useMutation({
     mutationFn: async (data: any) => {
