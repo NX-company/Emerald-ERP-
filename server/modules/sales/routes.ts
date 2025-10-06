@@ -346,6 +346,8 @@ router.post("/api/deals/:id/documents", async (req, res) => {
     
     if (!validationResult.success) {
       const errorMessage = fromZodError(validationResult.error).toString();
+      console.error("Validation error for deal document:", errorMessage);
+      console.error("Request body:", JSON.stringify(req.body, null, 2));
       res.status(400).json({ error: errorMessage });
       return;
     }

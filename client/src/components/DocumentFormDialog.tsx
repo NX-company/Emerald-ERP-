@@ -105,7 +105,7 @@ export function DocumentFormDialog({
         version: version,
         file_url: `placeholder-${Date.now()}`,
         data: { positions: positionsWithTotal },
-        total_amount: grandTotal,
+        total_amount: grandTotal.toString(),
         is_signed: documentType === 'contract' ? data.is_signed : false,
       });
     },
