@@ -53,13 +53,13 @@ interface AppSidebarProps {
 
 export function AppSidebar({ activeModule = "/" }: AppSidebarProps) {
   return (
-    <Sidebar>
+    <Sidebar collapsible="icon">
       <SidebarHeader className="border-b border-sidebar-border p-4">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary text-primary-foreground font-bold text-lg">
             E
           </div>
-          <div>
+          <div className="group-data-[collapsible=icon]:hidden">
             <h2 className="font-semibold text-sidebar-foreground">Emerald ERP</h2>
             <p className="text-xs text-muted-foreground">Фабрика мебели</p>
           </div>
@@ -136,7 +136,7 @@ export function AppSidebar({ activeModule = "/" }: AppSidebarProps) {
       <SidebarFooter className="border-t border-sidebar-border p-4">
         <div className="flex items-center gap-3">
           <UserAvatar name="Иван Петров" size="sm" />
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 group-data-[collapsible=icon]:hidden">
             <p className="text-sm font-medium text-sidebar-foreground truncate">Иван Петров</p>
             <p className="text-xs text-muted-foreground truncate">Директор</p>
           </div>
