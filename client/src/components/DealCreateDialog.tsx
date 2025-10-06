@@ -38,7 +38,6 @@ interface DealCreateDialogProps {
 }
 
 export function DealCreateDialog({ open, onOpenChange }: DealCreateDialogProps) {
-  const [newTag, setNewTag] = useState("");
   const { toast } = useToast();
 
   const { data: users = [] } = useQuery<User[]>({
@@ -54,7 +53,7 @@ export function DealCreateDialog({ open, onOpenChange }: DealCreateDialogProps) 
       stage: "new" as const,
       deadline: "",
       manager_id: "",
-      tags: [] as string[],
+      production_days: "",
     },
   });
 
