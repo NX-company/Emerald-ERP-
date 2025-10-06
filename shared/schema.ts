@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, pgEnum, numeric } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, pgEnum, numeric, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -12,6 +12,9 @@ export const financialTypeEnum = pgEnum("financial_type", ["income", "expense"])
 export const installationStatusEnum = pgEnum("installation_status", ["scheduled", "in_progress", "completed"]);
 export const priorityEnum = pgEnum("priority", ["low", "medium", "high", "critical"]);
 export const documentTypeEnum = pgEnum("document_type", ["proposal", "contract", "invoice", "drawing", "other"]);
+export const messageTypeEnum = pgEnum("message_type", ["note", "call", "email", "task", "status_change"]);
+export const dealDocumentTypeEnum = pgEnum("deal_document_type", ["quote", "invoice", "contract", "other"]);
+export const customFieldTypeEnum = pgEnum("custom_field_type", ["text", "number", "date", "checkbox", "file", "select"]);
 
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -54,6 +57,9 @@ export const deals = pgTable("deals", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   client_name: text("client_name").notNull(),
   company: text("company"),
+  contact_phone: text("contact_phone"),
+  contact_email: text("contact_email"),
+  order_number: text("order_number").unique(),
   amount: numeric("amount", { precision: 12, scale: 2 }),
   stage: text("stage").notNull().default("new"),
   deadline: timestamp("deadline"),
@@ -299,3 +305,75 @@ export const insertCompanySettingsSchema = createInsertSchema(company_settings).
 
 export type InsertCompanySettings = z.infer<typeof insertCompanySettingsSchema>;
 export type CompanySettings = typeof company_settings.$inferSelect;
+
+export const deal_messages = pgTable("deal_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  deal_id: varchar("deal_id").references(() => deals.id).notNull(),
+  message_type: messageTypeEnum("message_type").notNull(),
+  content: text("content").notNull(),
+  author_id: varchar("author_id").references(() => users.id).notNull(),
+  created_at: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertDealMessageSchema = createInsertSchema(deal_messages).omit({
+  id: true,
+  created_at: true,
+});
+
+export type InsertDealMessage = z.infer<typeof insertDealMessageSchema>;
+export type DealMessage = typeof deal_messages.$inferSelect;
+
+export const deal_documents = pgTable("deal_documents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  deal_id: varchar("deal_id").references(() => deals.id).notNull(),
+  document_type: dealDocumentTypeEnum("document_type").notNull(),
+  name: text("name").notNull(),
+  version: integer("version").default(1),
+  file_url: text("file_url").notNull(),
+  total_amount: numeric("total_amount", { precision: 12, scale: 2 }),
+  is_signed: boolean("is_signed").default(false),
+  parent_id: varchar("parent_id").references((): any => deal_documents.id),
+  created_at: timestamp("created_at").defaultNow().notNull(),
+  updated_at: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertDealDocumentSchema = createInsertSchema(deal_documents).omit({
+  id: true,
+  created_at: true,
+  updated_at: true,
+});
+
+export type InsertDealDocument = z.infer<typeof insertDealDocumentSchema>;
+export type DealDocument = typeof deal_documents.$inferSelect;
+
+export const custom_field_definitions = pgTable("custom_field_definitions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  field_type: customFieldTypeEnum("field_type").notNull(),
+  options: text("options").array(),
+  created_at: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertCustomFieldDefinitionSchema = createInsertSchema(custom_field_definitions).omit({
+  id: true,
+  created_at: true,
+});
+
+export type InsertCustomFieldDefinition = z.infer<typeof insertCustomFieldDefinitionSchema>;
+export type CustomFieldDefinition = typeof custom_field_definitions.$inferSelect;
+
+export const deal_custom_fields = pgTable("deal_custom_fields", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  deal_id: varchar("deal_id").references(() => deals.id).notNull(),
+  field_definition_id: varchar("field_definition_id").references(() => custom_field_definitions.id).notNull(),
+  value: text("value"),
+  created_at: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertDealCustomFieldSchema = createInsertSchema(deal_custom_fields).omit({
+  id: true,
+  created_at: true,
+});
+
+export type InsertDealCustomField = z.infer<typeof insertDealCustomFieldSchema>;
+export type DealCustomField = typeof deal_custom_fields.$inferSelect;
