@@ -5,12 +5,12 @@ import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Mail, Phone, Building2, DollarSign, MessageSquare, CheckSquare, Activity } from "lucide-react";
+import { Mail, Phone, Building2, DollarSign, MessageSquare, CheckSquare, Activity, Brain, Plus, FolderOpen, FileText } from "lucide-react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Deal, DealMessage, InsertDealMessage } from "@shared/schema";
+import type { Deal, DealMessage, InsertDealMessage, DealDocument } from "@shared/schema";
 
 interface DealCardModalProps {
   dealId: string | null;
@@ -29,8 +29,23 @@ export function DealCardModal({ dealId, open, onOpenChange }: DealCardModalProps
     enabled: !!dealId && open,
   });
 
+  const { data: documents = [], isLoading: documentsLoading } = useQuery<DealDocument[]>({
+    queryKey: ['/api/deals', dealId, 'documents'],
+    enabled: !!dealId && open,
+  });
+
   const [messageText, setMessageText] = useState("");
   const [messageType, setMessageType] = useState<"note" | "call" | "email" | "task">("note");
+
+  // Логика воркфлоу
+  const hasQuote = documents.some(doc => doc.document_type === 'quote');
+  const hasSignedContract = documents.some(
+    doc => doc.document_type === 'contract' && doc.is_signed
+  );
+
+  const quotes = documents.filter(doc => doc.document_type === 'quote');
+  const invoices = documents.filter(doc => doc.document_type === 'invoice');
+  const contracts = documents.filter(doc => doc.document_type === 'contract');
 
   const createMessage = useMutation({
     mutationFn: async (data: { message_type: "note" | "call" | "email" | "task"; content: string }) => {
@@ -217,9 +232,118 @@ export function DealCardModal({ dealId, open, onOpenChange }: DealCardModalProps
             </div>
 
             {/* Правая панель - действия */}
-            <div className="border-l p-4 overflow-y-auto" data-testid="panel-right-actions">
-              <h3 className="font-semibold mb-2">Действия</h3>
-              {/* Заглушка */}
+            <div className="border-l p-4 overflow-y-auto flex flex-col" data-testid="panel-right-actions">
+              <h3 className="font-semibold mb-4">Действия</h3>
+
+              {/* Кнопки воркфлоу */}
+              <div className="space-y-2 mb-6">
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start gap-2" 
+                  disabled
+                  data-testid="button-ai-calculate"
+                >
+                  <Brain className="w-4 h-4" />
+                  AI Просчёт
+                </Button>
+
+                <Button 
+                  className="w-full justify-start gap-2"
+                  data-testid="button-create-quote"
+                >
+                  <Plus className="w-4 h-4" />
+                  Создать КП
+                </Button>
+
+                {hasQuote && (
+                  <>
+                    <Button 
+                      variant="outline"
+                      className="w-full justify-start gap-2"
+                      data-testid="button-create-invoice"
+                    >
+                      <FileText className="w-4 h-4" />
+                      Выставить счёт
+                    </Button>
+
+                    <Button 
+                      variant="outline"
+                      className="w-full justify-start gap-2"
+                      data-testid="button-create-contract"
+                    >
+                      <FileText className="w-4 h-4" />
+                      Договор
+                    </Button>
+                  </>
+                )}
+
+                {hasSignedContract && (
+                  <Button 
+                    className="w-full justify-start gap-2"
+                    data-testid="button-create-project"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Создать проект
+                  </Button>
+                )}
+              </div>
+
+              <Separator className="my-4" />
+
+              {/* Дерево документов */}
+              <div className="flex-1">
+                <h4 className="text-sm font-medium mb-2">Дерево документов</h4>
+                {documentsLoading ? (
+                  <p className="text-sm text-muted-foreground">Загрузка...</p>
+                ) : documents.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Документы отсутствуют</p>
+                ) : (
+                  <div className="space-y-2 text-sm" data-testid="tree-documents">
+                    {quotes.length > 0 && (
+                      <div>
+                        <p className="font-medium">КП ({quotes.length})</p>
+                        {quotes.map(q => (
+                          <p key={q.id} className="text-muted-foreground ml-4">
+                            • {q.name} (v{q.version})
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                    {invoices.length > 0 && (
+                      <div>
+                        <p className="font-medium">Счета ({invoices.length})</p>
+                        {invoices.map(i => (
+                          <p key={i.id} className="text-muted-foreground ml-4">
+                            • {i.name}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                    {contracts.length > 0 && (
+                      <div>
+                        <p className="font-medium">Договоры ({contracts.length})</p>
+                        {contracts.map(c => (
+                          <p key={c.id} className="text-muted-foreground ml-4">
+                            • {c.name} {c.is_signed && '✓'}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <Separator className="my-4" />
+
+              {/* Кнопка документы */}
+              <Button 
+                variant="outline" 
+                className="w-full justify-start gap-2"
+                data-testid="button-all-documents"
+              >
+                <FolderOpen className="w-4 h-4" />
+                Документы
+              </Button>
             </div>
           </div>
         )}
