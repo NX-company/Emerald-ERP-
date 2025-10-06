@@ -99,7 +99,7 @@ export function DocumentFormDialog({
         total: calculateTotal(pos.price, pos.quantity)
       }));
 
-      return await apiRequest(`/api/deals/${dealId}/documents`, 'POST', {
+      return await apiRequest('POST', `/api/deals/${dealId}/documents`, {
         document_type: documentType,
         name: data.name,
         version: version,

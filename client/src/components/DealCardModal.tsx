@@ -54,7 +54,7 @@ export function DealCardModal({ dealId, open, onOpenChange }: DealCardModalProps
 
   const createMessage = useMutation({
     mutationFn: async (data: { message_type: "note" | "call" | "email" | "task"; content: string }) => {
-      return await apiRequest(`/api/deals/${dealId}/messages`, 'POST', {
+      return await apiRequest('POST', `/api/deals/${dealId}/messages`, {
         ...data,
         author_id: "c2fdd40b-dadf-4fbb-848a-74283d14802e"
       });
