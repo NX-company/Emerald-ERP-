@@ -9,7 +9,7 @@ import { Mail, Phone, Building2, DollarSign, MessageSquare, CheckSquare, Activit
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, getCurrentUserId } from "@/lib/queryClient";
 import { DocumentFormDialog } from "@/components/DocumentFormDialog";
 import { DeleteDealDialog } from "@/components/DeleteDealDialog";
 import { useToast } from "@/hooks/use-toast";
@@ -48,7 +48,7 @@ export function DealCardModal({ dealId, open, onOpenChange }: DealCardModalProps
   const { toast } = useToast();
 
   const { data: currentUser } = useQuery<User>({
-    queryKey: ['/api/users', 'c2fdd40b-dadf-4fbb-848a-74283d14802e'],
+    queryKey: ['/api/users', getCurrentUserId()],
     enabled: open,
   });
 
@@ -66,7 +66,7 @@ export function DealCardModal({ dealId, open, onOpenChange }: DealCardModalProps
     mutationFn: async (data: { message_type: "note" | "call" | "email" | "task"; content: string }) => {
       return await apiRequest('POST', `/api/deals/${dealId}/messages`, {
         ...data,
-        author_id: "c2fdd40b-dadf-4fbb-848a-74283d14802e"
+        author_id: getCurrentUserId()
       });
     },
     onSuccess: () => {
@@ -77,7 +77,7 @@ export function DealCardModal({ dealId, open, onOpenChange }: DealCardModalProps
 
   const deleteDeal = useMutation({
     mutationFn: async () => {
-      return await apiRequest('DELETE', `/api/deals/${dealId}?userId=c2fdd40b-dadf-4fbb-848a-74283d14802e`);
+      return await apiRequest('DELETE', `/api/deals/${dealId}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/deals'] });

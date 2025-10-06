@@ -15,7 +15,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import type { Deal, User, DealStage } from "@shared/schema";
 import { DragStartEvent, DragOverEvent, DragEndEvent } from "@dnd-kit/core";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, getCurrentUserId } from "@/lib/queryClient";
 
 export default function Sales() {
   const [view, setView] = useState<"kanban" | "list">("kanban");
@@ -44,7 +44,7 @@ export default function Sales() {
   });
 
   const { data: currentUser } = useQuery<User>({
-    queryKey: ['/api/users', 'c2fdd40b-dadf-4fbb-848a-74283d14802e'],
+    queryKey: ['/api/users', getCurrentUserId()],
   });
 
   useEffect(() => {
@@ -105,7 +105,7 @@ export default function Sales() {
 
   const bulkDeleteMutation = useMutation({
     mutationFn: async (dealIds: string[]) => {
-      return await apiRequest("POST", "/api/deals/bulk-delete?userId=c2fdd40b-dadf-4fbb-848a-74283d14802e", { dealIds });
+      return await apiRequest("POST", "/api/deals/bulk-delete", { dealIds });
     },
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/deals"] });
