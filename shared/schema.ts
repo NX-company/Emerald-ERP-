@@ -312,7 +312,7 @@ export type CompanySettings = typeof company_settings.$inferSelect;
 
 export const deal_messages = pgTable("deal_messages", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  deal_id: varchar("deal_id").references(() => deals.id).notNull(),
+  deal_id: varchar("deal_id").references(() => deals.id, { onDelete: "cascade" }).notNull(),
   message_type: messageTypeEnum("message_type").notNull(),
   content: text("content").notNull(),
   author_id: varchar("author_id").references(() => users.id).notNull(),
@@ -329,7 +329,7 @@ export type DealMessage = typeof deal_messages.$inferSelect;
 
 export const deal_documents = pgTable("deal_documents", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  deal_id: varchar("deal_id").references(() => deals.id).notNull(),
+  deal_id: varchar("deal_id").references(() => deals.id, { onDelete: "cascade" }).notNull(),
   document_type: dealDocumentTypeEnum("document_type").notNull(),
   name: text("name").notNull(),
   version: integer("version").default(1),
@@ -337,7 +337,7 @@ export const deal_documents = pgTable("deal_documents", {
   data: jsonb("data"),
   total_amount: numeric("total_amount", { precision: 12, scale: 2 }),
   is_signed: boolean("is_signed").default(false),
-  parent_id: varchar("parent_id").references((): any => deal_documents.id),
+  parent_id: varchar("parent_id").references((): any => deal_documents.id, { onDelete: "cascade" }),
   created_at: timestamp("created_at").defaultNow().notNull(),
   updated_at: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -369,7 +369,7 @@ export type CustomFieldDefinition = typeof custom_field_definitions.$inferSelect
 
 export const deal_custom_fields = pgTable("deal_custom_fields", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  deal_id: varchar("deal_id").references(() => deals.id).notNull(),
+  deal_id: varchar("deal_id").references(() => deals.id, { onDelete: "cascade" }).notNull(),
   field_definition_id: varchar("field_definition_id").references(() => custom_field_definitions.id).notNull(),
   value: text("value"),
   created_at: timestamp("created_at").defaultNow().notNull(),
