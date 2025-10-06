@@ -93,9 +93,9 @@ export function DealCardModal({ dealId, open, onOpenChange }: DealCardModalProps
             <p>Загрузка...</p>
           </div>
         ) : (
-          <div className="grid grid-cols-[300px_1fr_350px] h-full overflow-hidden">
+          <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr_350px] h-full overflow-hidden">
             {/* Левая панель - информация */}
-            <div className="border-r p-4 overflow-y-auto" data-testid="panel-left-info">
+            <div className="border-r p-4 overflow-y-auto max-h-[30vh] lg:max-h-none" data-testid="panel-left-info">
               {deal && (
                 <>
                   {/* Заголовок */}
@@ -177,7 +177,7 @@ export function DealCardModal({ dealId, open, onOpenChange }: DealCardModalProps
             </div>
 
             {/* Центральная панель - чат */}
-            <div className="flex flex-col h-full" data-testid="panel-center-chat">
+            <div className="flex flex-col h-full min-h-[30vh] lg:min-h-0" data-testid="panel-center-chat">
               {/* История */}
               <div className="flex-1 p-4 overflow-y-auto" data-testid="list-messages">
                 <h3 className="font-semibold mb-4">История сообщений</h3>
@@ -237,7 +237,7 @@ export function DealCardModal({ dealId, open, onOpenChange }: DealCardModalProps
             </div>
 
             {/* Правая панель - действия */}
-            <div className="border-l p-4 overflow-y-auto flex flex-col" data-testid="panel-right-actions">
+            <div className="border-l p-4 overflow-y-auto flex flex-col max-h-[30vh] lg:max-h-none" data-testid="panel-right-actions">
               <h3 className="font-semibold mb-4">Действия</h3>
 
               {/* Кнопки воркфлоу */}
