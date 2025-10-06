@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { salesRepository } from "./repository";
-import { insertDealSchema, insertDealStageSchema, insertDealMessageSchema } from "@shared/schema";
+import { insertDealSchema, insertDealStageSchema, insertDealMessageSchema, insertDealDocumentSchema } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
 
 export const router = Router();
@@ -299,5 +299,100 @@ router.post("/api/deals/:id/messages", async (req, res) => {
   } catch (error) {
     console.error("Error creating deal message:", error);
     res.status(500).json({ error: "Failed to create message" });
+  }
+});
+
+// ========== Deal Documents Endpoints ==========
+
+// GET /api/deals/:id/documents - получить все документы по сделке
+router.get("/api/deals/:id/documents", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const documents = await salesRepository.getDealDocuments(id);
+    res.json(documents);
+  } catch (error) {
+    console.error("Error fetching deal documents:", error);
+    res.status(500).json({ error: "Failed to fetch documents" });
+  }
+});
+
+// GET /api/deals/:dealId/documents/:docId - получить документ по ID
+router.get("/api/deals/:dealId/documents/:docId", async (req, res) => {
+  try {
+    const { docId } = req.params;
+    const document = await salesRepository.getDealDocumentById(docId);
+    
+    if (!document) {
+      res.status(404).json({ error: "Document not found" });
+      return;
+    }
+    
+    res.json(document);
+  } catch (error) {
+    console.error("Error fetching document:", error);
+    res.status(500).json({ error: "Failed to fetch document" });
+  }
+});
+
+// POST /api/deals/:id/documents - создать новый документ (КП, счет, договор)
+router.post("/api/deals/:id/documents", async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const validationResult = insertDealDocumentSchema.safeParse({
+      ...req.body,
+      deal_id: id
+    });
+    
+    if (!validationResult.success) {
+      const errorMessage = fromZodError(validationResult.error).toString();
+      res.status(400).json({ error: errorMessage });
+      return;
+    }
+    
+    const newDocument = await salesRepository.createDealDocument(validationResult.data);
+    res.status(201).json(newDocument);
+  } catch (error) {
+    console.error("Error creating deal document:", error);
+    res.status(500).json({ error: "Failed to create document" });
+  }
+});
+
+// PUT /api/deals/:dealId/documents/:docId - обновить документ
+router.put("/api/deals/:dealId/documents/:docId", async (req, res) => {
+  try {
+    const { docId } = req.params;
+    
+    const validationResult = insertDealDocumentSchema.partial().safeParse(req.body);
+    
+    if (!validationResult.success) {
+      const errorMessage = fromZodError(validationResult.error).toString();
+      res.status(400).json({ error: errorMessage });
+      return;
+    }
+    
+    const updated = await salesRepository.updateDealDocument(docId, validationResult.data);
+    
+    if (!updated) {
+      res.status(404).json({ error: "Document not found" });
+      return;
+    }
+    
+    res.json(updated);
+  } catch (error) {
+    console.error("Error updating document:", error);
+    res.status(500).json({ error: "Failed to update document" });
+  }
+});
+
+// DELETE /api/deals/:dealId/documents/:docId - удалить документ
+router.delete("/api/deals/:dealId/documents/:docId", async (req, res) => {
+  try {
+    const { docId } = req.params;
+    await salesRepository.deleteDealDocument(docId);
+    res.status(204).send();
+  } catch (error) {
+    console.error("Error deleting document:", error);
+    res.status(500).json({ error: "Failed to delete document" });
   }
 });

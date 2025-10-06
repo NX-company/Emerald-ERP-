@@ -1,7 +1,7 @@
 import { db } from "../../db";
 import { eq, asc, desc, sql } from "drizzle-orm";
-import type { Deal, InsertDeal, DealStage, InsertDealStage, DealMessage, InsertDealMessage } from "@shared/schema";
-import { deals, dealStages, deal_messages } from "@shared/schema";
+import type { Deal, InsertDeal, DealStage, InsertDealStage, DealMessage, InsertDealMessage, DealDocument, InsertDealDocument } from "@shared/schema";
+import { deals, dealStages, deal_messages, deal_documents } from "@shared/schema";
 
 export class SalesRepository {
   async getAllDeals(): Promise<Deal[]> {
@@ -101,6 +101,43 @@ export class SalesRepository {
       .values(data)
       .returning();
     return message;
+  }
+
+  async getDealDocuments(dealId: string): Promise<DealDocument[]> {
+    return await db
+      .select()
+      .from(deal_documents)
+      .where(eq(deal_documents.deal_id, dealId))
+      .orderBy(desc(deal_documents.created_at));
+  }
+
+  async getDealDocumentById(id: string): Promise<DealDocument | undefined> {
+    const [document] = await db
+      .select()
+      .from(deal_documents)
+      .where(eq(deal_documents.id, id));
+    return document;
+  }
+
+  async createDealDocument(data: InsertDealDocument): Promise<DealDocument> {
+    const [document] = await db
+      .insert(deal_documents)
+      .values(data)
+      .returning();
+    return document;
+  }
+
+  async updateDealDocument(id: string, data: Partial<InsertDealDocument>): Promise<DealDocument | undefined> {
+    const [updated] = await db
+      .update(deal_documents)
+      .set({ ...data, updated_at: new Date() })
+      .where(eq(deal_documents.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteDealDocument(id: string): Promise<void> {
+    await db.delete(deal_documents).where(eq(deal_documents.id, id));
   }
 }
 
