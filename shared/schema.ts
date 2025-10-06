@@ -65,6 +65,7 @@ export const deals = pgTable("deals", {
   deadline: timestamp("deadline"),
   manager_id: varchar("manager_id").references(() => users.id),
   production_days_count: integer("production_days_count"),
+  tags: text("tags").array(),
   created_at: timestamp("created_at").defaultNow().notNull(),
   updated_at: timestamp("updated_at").defaultNow().notNull(),
 });

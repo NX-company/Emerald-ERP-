@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -25,7 +26,8 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { X, Plus, Loader2 } from "lucide-react";
 import { insertDealSchema, type User } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -36,6 +38,7 @@ interface DealCreateDialogProps {
 }
 
 export function DealCreateDialog({ open, onOpenChange }: DealCreateDialogProps) {
+  const [newTag, setNewTag] = useState("");
   const { toast } = useToast();
 
   const { data: users = [] } = useQuery<User[]>({
@@ -52,6 +55,7 @@ export function DealCreateDialog({ open, onOpenChange }: DealCreateDialogProps) 
       deadline: "",
       manager_id: "",
       production_days_count: "",
+      tags: [] as string[],
     },
   });
 
@@ -64,6 +68,7 @@ export function DealCreateDialog({ open, onOpenChange }: DealCreateDialogProps) 
         deadline: data.deadline ? new Date(data.deadline).toISOString() : null,
         manager_id: data.manager_id || null,
         production_days_count: data.production_days_count ? parseInt(data.production_days_count) : null,
+        tags: data.tags.length > 0 ? data.tags : null,
       };
       await apiRequest("POST", "/api/deals", dealData);
     },
@@ -88,6 +93,19 @@ export function DealCreateDialog({ open, onOpenChange }: DealCreateDialogProps) 
   const handleSubmit = form.handleSubmit((data) => {
     createMutation.mutate(data);
   });
+
+  const handleAddTag = () => {
+    if (newTag.trim()) {
+      const currentTags = form.getValues("tags") || [];
+      form.setValue("tags", [...currentTags, newTag.trim()]);
+      setNewTag("");
+    }
+  };
+
+  const handleRemoveTag = (index: number) => {
+    const currentTags = form.getValues("tags") || [];
+    form.setValue("tags", currentTags.filter((_, i) => i !== index));
+  };
 
   const stageLabels: Record<string, string> = {
     new: "Новые",
@@ -265,6 +283,61 @@ export function DealCreateDialog({ open, onOpenChange }: DealCreateDialogProps) 
                       data-testid="input-create-production-days"
                     />
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="tags"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Теги</FormLabel>
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <Input
+                        value={newTag}
+                        onChange={(e) => setNewTag(e.target.value)}
+                        placeholder="Добавить тег"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleAddTag();
+                          }
+                        }}
+                        data-testid="input-create-new-tag"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={handleAddTag}
+                        data-testid="button-create-add-tag"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {field.value?.map((tag, index) => (
+                        <Badge 
+                          key={index} 
+                          variant="secondary"
+                          data-testid={`tag-create-${index}`}
+                        >
+                          {tag}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveTag(index)}
+                            className="ml-1 hover:text-destructive"
+                            data-testid={`button-create-remove-tag-${index}`}
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
                   <FormMessage />
                 </FormItem>
               )}
