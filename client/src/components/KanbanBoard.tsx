@@ -24,6 +24,7 @@ interface KanbanColumn {
   id: string;
   title: string;
   count: number;
+  color?: string;
   items: { id: string; content: ReactNode }[];
 }
 
@@ -68,21 +69,31 @@ interface DroppableColumnProps {
   id: string;
   title: string;
   count: number;
+  color?: string;
   items: { id: string; content: ReactNode }[];
 }
 
-function DroppableColumn({ id, title, count, items }: DroppableColumnProps) {
+function DroppableColumn({ id, title, count, color, items }: DroppableColumnProps) {
   const { setNodeRef } = useSortable({ id });
 
   return (
     <div ref={setNodeRef} className="flex-shrink-0 w-80" data-testid={`column-${id}`}>
       <Card>
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-medium" data-testid={`text-column-title-${id}`}>
-              {title}
-            </CardTitle>
-            <Badge variant="secondary" data-testid={`text-column-count-${id}`}>{count}</Badge>
+          <div className="flex items-center gap-2">
+            {color && (
+              <div 
+                className="w-1 h-6 rounded-full" 
+                style={{ backgroundColor: color }}
+                data-testid={`color-indicator-${id}`}
+              />
+            )}
+            <div className="flex items-center justify-between flex-1">
+              <CardTitle className="text-sm font-medium" data-testid={`text-column-title-${id}`}>
+                {title}
+              </CardTitle>
+              <Badge variant="secondary" data-testid={`text-column-count-${id}`}>{count}</Badge>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-3 min-h-[200px]">
@@ -132,6 +143,7 @@ export function KanbanBoard({
               id={column.id}
               title={column.title}
               count={column.count}
+              color={column.color}
               items={column.items}
             />
           ))}

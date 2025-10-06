@@ -152,6 +152,7 @@ export default function Sales() {
   const kanbanColumns = stages.map(stage => ({
     id: stage.key,
     title: stage.name,
+    color: stage.color ?? undefined,
     count: transformedDeals.filter((d) => d.stage === stage.key).length,
     items: transformedDeals
       .filter((d) => d.stage === stage.key)
