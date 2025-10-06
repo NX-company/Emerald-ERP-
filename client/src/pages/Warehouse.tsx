@@ -1,29 +1,30 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Plus, QrCode, FileBarChart, Search, AlertTriangle, Package } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import type { WarehouseItem } from "@shared/schema";
+import { WarehouseItemCard } from "@/components/WarehouseItemCard";
+import { WarehouseItemDetailSheet } from "@/components/WarehouseItemDetailSheet";
+import { WarehouseItemCreateDialog } from "@/components/WarehouseItemCreateDialog";
+import type { WarehouseItem, User } from "@shared/schema";
 
 export default function Warehouse() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedItem, setSelectedItem] = useState<WarehouseItem | null>(null);
+  const [isDetailSheetOpen, setIsDetailSheetOpen] = useState(false);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<"all" | "normal" | "low" | "critical">("all");
   const { toast } = useToast();
 
   const { data: items = [], isLoading, error } = useQuery<WarehouseItem[]>({
-    queryKey: ["/api/warehouse"],
+    queryKey: ["/api/warehouse/items"],
+  });
+
+  const { data: users = [] } = useQuery<User[]>({
+    queryKey: ["/api/users"],
   });
 
   if (error) {
@@ -34,93 +35,49 @@ export default function Warehouse() {
     });
   }
 
-  const filteredItems = items.filter(
-    (item) =>
-      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.id.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const currentUserId = users[0]?.id || "";
 
-  const getStatusBadge = (status: "normal" | "low" | "critical") => {
-    const config = {
-      normal: { label: "В норме", variant: "outline" as const },
-      low: { label: "Низкий", variant: "secondary" as const },
-      critical: { label: "Критический", variant: "destructive" as const },
-    };
-    return config[status];
+  const filteredItems = items.filter((item) => {
+    const matchesSearch = 
+      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.id.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const matchesStatus = statusFilter === "all" || item.status === statusFilter;
+    
+    return matchesSearch && matchesStatus;
+  });
+
+  const handleItemClick = (itemId: string) => {
+    const item = items.find(i => i.id === itemId);
+    if (item) {
+      setSelectedItem(item);
+      setIsDetailSheetOpen(true);
+    }
   };
 
-  const renderTable = (itemsToRender: WarehouseItem[]) => (
-    <Card>
-      <CardContent className="p-0">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-32">Артикул</TableHead>
-              <TableHead>Название</TableHead>
-              <TableHead className="w-32 text-right">Остаток</TableHead>
-              <TableHead className="w-24">Ед. изм.</TableHead>
-              <TableHead className="w-40">Расположение</TableHead>
-              <TableHead className="w-32 text-right">Мин. остаток</TableHead>
-              <TableHead className="w-32 text-center">Статус</TableHead>
-              <TableHead className="w-24 text-center">Действия</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {itemsToRender.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                  Ничего не найдено
-                </TableCell>
-              </TableRow>
-            ) : (
-              itemsToRender.map((item) => {
-                const statusConfig = getStatusBadge(item.status);
-                const quantity = parseFloat(item.quantity);
-                const minStock = parseFloat(item.min_stock || "0");
-                return (
-                  <TableRow
-                    key={item.id}
-                    className="hover-elevate"
-                    data-testid={`row-warehouse-${item.id}`}
-                  >
-                    <TableCell className="font-mono text-xs">{item.id}</TableCell>
-                    <TableCell className="font-medium">{item.name}</TableCell>
-                    <TableCell className="text-right">
-                      <span className={item.status === "critical" || item.status === "low" ? "text-destructive font-semibold" : "font-semibold"}>
-                        {quantity}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-sm">{item.unit}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{item.location || "—"}</TableCell>
-                    <TableCell className="text-right text-sm text-muted-foreground">
-                      {minStock} {item.unit}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <Badge variant={statusConfig.variant} className="gap-1 text-xs">
-                        {(item.status === "critical" || item.status === "low") && (
-                          <AlertTriangle className="h-3 w-3" />
-                        )}
-                        {statusConfig.label}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7"
-                        data-testid={`button-qr-${item.id}`}
-                      >
-                        <QrCode className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
+  const renderGrid = (itemsToRender: WarehouseItem[]) => (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {itemsToRender.length === 0 ? (
+        <div className="col-span-full text-center py-12 text-muted-foreground" data-testid="text-no-items">
+          Ничего не найдено
+        </div>
+      ) : (
+        itemsToRender.map((item) => (
+          <WarehouseItemCard
+            key={item.id}
+            id={item.id}
+            name={item.name}
+            quantity={parseFloat(item.quantity)}
+            unit={item.unit}
+            location={item.location}
+            category={item.category}
+            status={item.status}
+            minStock={parseFloat(item.min_stock || "0")}
+            onClick={() => handleItemClick(item.id)}
+          />
+        ))
+      )}
+    </div>
   );
 
   return (
@@ -131,17 +88,12 @@ export default function Warehouse() {
           <p className="text-sm text-muted-foreground mt-1">Учет материалов и готовой продукции</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" data-testid="button-inventory">
-            <FileBarChart className="h-4 w-4 mr-2" />
-            Инвентаризация
-          </Button>
-          <Button variant="outline" data-testid="button-scan-qr">
-            <QrCode className="h-4 w-4 mr-2" />
-            Сканировать
-          </Button>
-          <Button data-testid="button-add-item">
+          <Button 
+            onClick={() => setIsCreateDialogOpen(true)}
+            data-testid="button-create-warehouse-item"
+          >
             <Plus className="h-4 w-4 mr-2" />
-            Приход
+            Новая позиция
           </Button>
         </div>
       </div>
@@ -157,52 +109,85 @@ export default function Warehouse() {
             data-testid="input-search-warehouse"
           />
         </div>
+        <Tabs value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)} className="w-auto">
+          <TabsList>
+            <TabsTrigger value="all" data-testid="filter-status-all">
+              Все
+            </TabsTrigger>
+            <TabsTrigger value="normal" data-testid="filter-status-normal">
+              Норма
+            </TabsTrigger>
+            <TabsTrigger value="low" data-testid="filter-status-low">
+              Низкий
+            </TabsTrigger>
+            <TabsTrigger value="critical" data-testid="filter-status-critical">
+              Критический
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
 
       <Tabs defaultValue="all" className="w-full">
         <TabsList>
-          <TabsTrigger value="all">
-            Все товары ({filteredItems.length})
+          <TabsTrigger value="all" data-testid="tab-category-all">
+            Все ({filteredItems.length})
           </TabsTrigger>
-          <TabsTrigger value="materials">
+          <TabsTrigger value="materials" data-testid="tab-category-materials">
             Материалы ({filteredItems.filter(i => i.category === "materials").length})
           </TabsTrigger>
-          <TabsTrigger value="products">
+          <TabsTrigger value="products" data-testid="tab-category-products">
             Готовая продукция ({filteredItems.filter(i => i.category === "products").length})
           </TabsTrigger>
-          <TabsTrigger value="alerts">
-            Требуют внимания ({filteredItems.filter(i => i.status === "low" || i.status === "critical").length})
-          </TabsTrigger>
         </TabsList>
+
         <TabsContent value="all" className="mt-6">
           {isLoading ? (
-            <Skeleton className="h-96" data-testid="skeleton-warehouse" />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <Skeleton key={i} className="h-64" data-testid={`skeleton-warehouse-${i}`} />
+              ))}
+            </div>
           ) : (
-            renderTable(filteredItems)
+            renderGrid(filteredItems)
           )}
         </TabsContent>
+
         <TabsContent value="materials" className="mt-6">
           {isLoading ? (
-            <Skeleton className="h-96" data-testid="skeleton-warehouse" />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-64" data-testid={`skeleton-warehouse-${i}`} />
+              ))}
+            </div>
           ) : (
-            renderTable(filteredItems.filter(i => i.category === "materials"))
+            renderGrid(filteredItems.filter(i => i.category === "materials"))
           )}
         </TabsContent>
+
         <TabsContent value="products" className="mt-6">
           {isLoading ? (
-            <Skeleton className="h-96" data-testid="skeleton-warehouse" />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-64" data-testid={`skeleton-warehouse-${i}`} />
+              ))}
+            </div>
           ) : (
-            renderTable(filteredItems.filter(i => i.category === "products"))
-          )}
-        </TabsContent>
-        <TabsContent value="alerts" className="mt-6">
-          {isLoading ? (
-            <Skeleton className="h-96" data-testid="skeleton-warehouse" />
-          ) : (
-            renderTable(filteredItems.filter(i => i.status === "low" || i.status === "critical"))
+            renderGrid(filteredItems.filter(i => i.category === "products"))
           )}
         </TabsContent>
       </Tabs>
+
+      <WarehouseItemDetailSheet
+        item={selectedItem}
+        open={isDetailSheetOpen}
+        onOpenChange={setIsDetailSheetOpen}
+        currentUserId={currentUserId}
+      />
+
+      <WarehouseItemCreateDialog
+        open={isCreateDialogOpen}
+        onOpenChange={setIsCreateDialogOpen}
+      />
     </div>
   );
 }

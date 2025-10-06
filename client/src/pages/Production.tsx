@@ -1,16 +1,22 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ProductionCard } from "@/components/ProductionCard";
+import { ProductionTaskDetailSheet } from "@/components/ProductionTaskDetailSheet";
+import { ProductionTaskCreateDialog } from "@/components/ProductionTaskCreateDialog";
 import { Button } from "@/components/ui/button";
 import { Plus, QrCode } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import type { ProductionTask, ProductionStage, User } from "@shared/schema";
+import type { ProductionTask, ProductionStage, User, Project } from "@shared/schema";
 
 type ProductionTaskWithStages = ProductionTask & { stages: ProductionStage[] };
 
 export default function Production() {
   const { toast } = useToast();
+  const [selectedTask, setSelectedTask] = useState<ProductionTask | null>(null);
+  const [isDetailSheetOpen, setIsDetailSheetOpen] = useState(false);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
   const { data: productionTasks = [], isLoading: tasksLoading, error: tasksError } = useQuery<ProductionTaskWithStages[]>({
     queryKey: ["/api/production"],
@@ -18,6 +24,10 @@ export default function Production() {
 
   const { data: users = [], isLoading: usersLoading } = useQuery<User[]>({
     queryKey: ["/api/users"],
+  });
+
+  const { data: projects = [], isLoading: projectsLoading } = useQuery<Project[]>({
+    queryKey: ["/api/projects"],
   });
 
   if (tasksError) {
@@ -28,12 +38,18 @@ export default function Production() {
     });
   }
 
-  const isLoading = tasksLoading || usersLoading;
+  const isLoading = tasksLoading || usersLoading || projectsLoading;
 
   const getUserName = (userId: string | null) => {
     if (!userId) return "Не назначен";
     const user = users.find(u => u.id === userId);
     return user?.full_name || user?.username || "Не назначен";
+  };
+
+  const getProjectName = (projectId: string | null) => {
+    if (!projectId) return null;
+    const project = projects.find(p => p.id === projectId);
+    return project?.name || null;
   };
 
   const formatDate = (date: Date | null) => {
@@ -45,9 +61,19 @@ export default function Production() {
     });
   };
 
+  const handleCardClick = (task: ProductionTaskWithStages) => {
+    setSelectedTask(task);
+    setIsDetailSheetOpen(true);
+  };
+
+  const handleCreateClick = () => {
+    setIsCreateDialogOpen(true);
+  };
+
   const transformedTasks = productionTasks.map(task => ({
     id: task.id,
     itemName: task.item_name,
+    projectName: getProjectName(task.project_id),
     stages: task.stages.map(stage => ({
       name: stage.name,
       status: stage.status,
@@ -59,6 +85,10 @@ export default function Production() {
     qrCode: !!task.qr_code,
     status: task.status,
   }));
+
+  const pendingTasks = transformedTasks.filter((t) => t.status === "pending");
+  const inProgressTasks = transformedTasks.filter((t) => t.status === "in_progress");
+  const completedTasks = transformedTasks.filter((t) => t.status === "completed");
 
   return (
     <div className="space-y-6">
@@ -72,7 +102,7 @@ export default function Production() {
             <QrCode className="h-4 w-4 mr-2" />
             Сканировать QR
           </Button>
-          <Button data-testid="button-create-task">
+          <Button onClick={handleCreateClick} data-testid="button-create-production">
             <Plus className="h-4 w-4 mr-2" />
             Новое задание
           </Button>
@@ -81,64 +111,147 @@ export default function Production() {
 
       <Tabs defaultValue="all" className="w-full">
         <TabsList>
-          <TabsTrigger value="all">Все задания ({transformedTasks.length})</TabsTrigger>
-          <TabsTrigger value="in_progress">
-            В работе ({transformedTasks.filter((t) => t.status === "in_progress").length})
+          <TabsTrigger value="all" data-testid="tab-production-all">
+            Все задания ({transformedTasks.length})
           </TabsTrigger>
-          <TabsTrigger value="completed">
-            Завершено ({transformedTasks.filter((t) => t.status === "completed").length})
+          <TabsTrigger value="pending" data-testid="tab-production-pending">
+            В ожидании ({pendingTasks.length})
+          </TabsTrigger>
+          <TabsTrigger value="in_progress" data-testid="tab-production-in_progress">
+            В работе ({inProgressTasks.length})
+          </TabsTrigger>
+          <TabsTrigger value="completed" data-testid="tab-production-completed">
+            Завершенные ({completedTasks.length})
           </TabsTrigger>
         </TabsList>
+
         <TabsContent value="all" className="mt-6">
           {isLoading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {[1, 2, 3, 4].map((i) => (
-                <Skeleton key={i} className="h-64" data-testid={`skeleton-production-${i}`} />
+                <Skeleton key={i} className="h-80" data-testid={`skeleton-production-${i}`} />
               ))}
+            </div>
+          ) : transformedTasks.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground" data-testid="text-no-production-tasks">
+                Нет производственных заданий
+              </p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {transformedTasks.map((task) => (
-                <ProductionCard key={task.id} {...task} />
-              ))}
+              {transformedTasks.map((task) => {
+                const originalTask = productionTasks.find(t => t.id === task.id);
+                return (
+                  <ProductionCard 
+                    key={task.id} 
+                    {...task} 
+                    onClick={() => originalTask && handleCardClick(originalTask)}
+                  />
+                );
+              })}
             </div>
           )}
         </TabsContent>
+
+        <TabsContent value="pending" className="mt-6">
+          {isLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[1, 2].map((i) => (
+                <Skeleton key={i} className="h-80" data-testid={`skeleton-production-${i}`} />
+              ))}
+            </div>
+          ) : pendingTasks.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground" data-testid="text-no-pending-tasks">
+                Нет заданий в ожидании
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {pendingTasks.map((task) => {
+                const originalTask = productionTasks.find(t => t.id === task.id);
+                return (
+                  <ProductionCard 
+                    key={task.id} 
+                    {...task} 
+                    onClick={() => originalTask && handleCardClick(originalTask)}
+                  />
+                );
+              })}
+            </div>
+          )}
+        </TabsContent>
+
         <TabsContent value="in_progress" className="mt-6">
           {isLoading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {[1, 2].map((i) => (
-                <Skeleton key={i} className="h-64" data-testid={`skeleton-production-${i}`} />
+                <Skeleton key={i} className="h-80" data-testid={`skeleton-production-${i}`} />
               ))}
+            </div>
+          ) : inProgressTasks.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground" data-testid="text-no-in-progress-tasks">
+                Нет заданий в работе
+              </p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {transformedTasks
-                .filter((t) => t.status === "in_progress")
-                .map((task) => (
-                  <ProductionCard key={task.id} {...task} />
-                ))}
+              {inProgressTasks.map((task) => {
+                const originalTask = productionTasks.find(t => t.id === task.id);
+                return (
+                  <ProductionCard 
+                    key={task.id} 
+                    {...task} 
+                    onClick={() => originalTask && handleCardClick(originalTask)}
+                  />
+                );
+              })}
             </div>
           )}
         </TabsContent>
+
         <TabsContent value="completed" className="mt-6">
           {isLoading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {[1].map((i) => (
-                <Skeleton key={i} className="h-64" data-testid={`skeleton-production-${i}`} />
+                <Skeleton key={i} className="h-80" data-testid={`skeleton-production-${i}`} />
               ))}
+            </div>
+          ) : completedTasks.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground" data-testid="text-no-completed-tasks">
+                Нет завершенных заданий
+              </p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {transformedTasks
-                .filter((t) => t.status === "completed")
-                .map((task) => (
-                  <ProductionCard key={task.id} {...task} />
-                ))}
+              {completedTasks.map((task) => {
+                const originalTask = productionTasks.find(t => t.id === task.id);
+                return (
+                  <ProductionCard 
+                    key={task.id} 
+                    {...task} 
+                    onClick={() => originalTask && handleCardClick(originalTask)}
+                  />
+                );
+              })}
             </div>
           )}
         </TabsContent>
       </Tabs>
+
+      <ProductionTaskDetailSheet
+        task={selectedTask}
+        open={isDetailSheetOpen}
+        onOpenChange={setIsDetailSheetOpen}
+      />
+
+      <ProductionTaskCreateDialog
+        open={isCreateDialogOpen}
+        onOpenChange={setIsCreateDialogOpen}
+      />
     </div>
   );
 }

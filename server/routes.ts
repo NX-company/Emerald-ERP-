@@ -425,6 +425,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/production/:id/stages - Get all stages for a production task
+  app.get("/api/production/:id/stages", async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      const task = await storage.getProductionTaskById(id);
+      if (!task) {
+        res.status(404).json({ error: "Production task not found" });
+        return;
+      }
+      
+      const stages = await storage.getProductionStages(id);
+      res.json(stages);
+    } catch (error) {
+      console.error("Error fetching production stages:", error);
+      res.status(500).json({ error: "Failed to fetch production stages" });
+    }
+  });
+
   // POST /api/production/:id/stages - Create stage for production task
   app.post("/api/production/:id/stages", async (req, res) => {
     try {
