@@ -1,77 +1,64 @@
+import { useQuery } from "@tanstack/react-query";
 import { ProductionCard } from "@/components/ProductionCard";
 import { Button } from "@/components/ui/button";
 import { Plus, QrCode } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
+import type { ProductionTask, ProductionStage, User } from "@shared/schema";
+
+type ProductionTaskWithStages = ProductionTask & { stages: ProductionStage[] };
 
 export default function Production() {
-  // todo: remove mock functionality
-  const productionTasks = [
-    {
-      id: "301",
-      itemName: "Кухонный фасад верхний",
-      stages: [
-        { name: "Раскрой", status: "completed" as const },
-        { name: "Кромка", status: "completed" as const },
-        { name: "Фрезеровка", status: "completed" as const },
-        { name: "Покраска", status: "completed" as const },
-        { name: "Сборка", status: "completed" as const },
-      ],
-      progress: 100,
-      worker: "Андрей Кузнецов",
-      payment: 3500,
-      deadline: "08.11.2025",
-      qrCode: true,
-      status: "completed",
-    },
-    {
-      id: "302",
-      itemName: "Столешница 3000мм",
-      stages: [
-        { name: "Раскрой", status: "completed" as const },
-        { name: "Фрезеровка", status: "in_progress" as const },
-        { name: "Полировка", status: "pending" as const },
-        { name: "Упаковка", status: "pending" as const },
-      ],
-      progress: 45,
-      worker: "Михаил Соколов",
-      payment: 5000,
-      deadline: "09.11.2025",
-      qrCode: true,
-      status: "in_progress",
-    },
-    {
-      id: "303",
-      itemName: "Дверца шкафа-купе",
-      stages: [
-        { name: "Раскрой", status: "completed" as const },
-        { name: "Кромка", status: "completed" as const },
-        { name: "Покраска", status: "in_progress" as const },
-        { name: "Сушка", status: "pending" as const },
-        { name: "Упаковка", status: "pending" as const },
-      ],
-      progress: 20,
-      worker: "Дмитрий Попов",
-      payment: 4200,
-      deadline: "10.11.2025",
-      qrCode: true,
-      status: "in_progress",
-    },
-    {
-      id: "304",
-      itemName: "Полка навесная",
-      stages: [
-        { name: "Раскрой", status: "pending" as const },
-        { name: "Кромка", status: "pending" as const },
-        { name: "Сборка", status: "pending" as const },
-      ],
-      progress: 0,
-      worker: "Сергей Морозов",
-      payment: 2800,
-      deadline: "11.11.2025",
-      qrCode: true,
-      status: "pending",
-    },
-  ];
+  const { toast } = useToast();
+
+  const { data: productionTasks = [], isLoading: tasksLoading, error: tasksError } = useQuery<ProductionTaskWithStages[]>({
+    queryKey: ["/api/production"],
+  });
+
+  const { data: users = [], isLoading: usersLoading } = useQuery<User[]>({
+    queryKey: ["/api/users"],
+  });
+
+  if (tasksError) {
+    toast({
+      title: "Ошибка загрузки",
+      description: "Не удалось загрузить производственные задания",
+      variant: "destructive",
+    });
+  }
+
+  const isLoading = tasksLoading || usersLoading;
+
+  const getUserName = (userId: string | null) => {
+    if (!userId) return "Не назначен";
+    const user = users.find(u => u.id === userId);
+    return user?.full_name || user?.username || "Не назначен";
+  };
+
+  const formatDate = (date: Date | null) => {
+    if (!date) return "Не установлен";
+    return new Date(date).toLocaleDateString("ru-RU", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+  };
+
+  const transformedTasks = productionTasks.map(task => ({
+    id: task.id,
+    itemName: task.item_name,
+    stages: task.stages.map(stage => ({
+      name: stage.name,
+      status: stage.status,
+    })),
+    progress: task.progress || 0,
+    worker: getUserName(task.worker_id),
+    payment: parseFloat(task.payment || "0"),
+    deadline: formatDate(task.deadline),
+    qrCode: !!task.qr_code,
+    status: task.status,
+  }));
 
   return (
     <div className="space-y-6">
@@ -94,38 +81,62 @@ export default function Production() {
 
       <Tabs defaultValue="all" className="w-full">
         <TabsList>
-          <TabsTrigger value="all">Все задания ({productionTasks.length})</TabsTrigger>
+          <TabsTrigger value="all">Все задания ({transformedTasks.length})</TabsTrigger>
           <TabsTrigger value="in_progress">
-            В работе ({productionTasks.filter((t) => t.status === "in_progress").length})
+            В работе ({transformedTasks.filter((t) => t.status === "in_progress").length})
           </TabsTrigger>
           <TabsTrigger value="completed">
-            Завершено ({productionTasks.filter((t) => t.status === "completed").length})
+            Завершено ({transformedTasks.filter((t) => t.status === "completed").length})
           </TabsTrigger>
         </TabsList>
         <TabsContent value="all" className="mt-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {productionTasks.map((task) => (
-              <ProductionCard key={task.id} {...task} />
-            ))}
-          </div>
+          {isLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[1, 2, 3, 4].map((i) => (
+                <Skeleton key={i} className="h-64" data-testid={`skeleton-production-${i}`} />
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {transformedTasks.map((task) => (
+                <ProductionCard key={task.id} {...task} />
+              ))}
+            </div>
+          )}
         </TabsContent>
         <TabsContent value="in_progress" className="mt-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {productionTasks
-              .filter((t) => t.status === "in_progress")
-              .map((task) => (
-                <ProductionCard key={task.id} {...task} />
+          {isLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[1, 2].map((i) => (
+                <Skeleton key={i} className="h-64" data-testid={`skeleton-production-${i}`} />
               ))}
-          </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {transformedTasks
+                .filter((t) => t.status === "in_progress")
+                .map((task) => (
+                  <ProductionCard key={task.id} {...task} />
+                ))}
+            </div>
+          )}
         </TabsContent>
         <TabsContent value="completed" className="mt-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {productionTasks
-              .filter((t) => t.status === "completed")
-              .map((task) => (
-                <ProductionCard key={task.id} {...task} />
+          {isLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[1].map((i) => (
+                <Skeleton key={i} className="h-64" data-testid={`skeleton-production-${i}`} />
               ))}
-          </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {transformedTasks
+                .filter((t) => t.status === "completed")
+                .map((task) => (
+                  <ProductionCard key={task.id} {...task} />
+                ))}
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </div>

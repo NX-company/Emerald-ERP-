@@ -1,87 +1,94 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, LayoutGrid, List } from "lucide-react";
 import { KanbanBoard } from "@/components/KanbanBoard";
 import { DealCard } from "@/components/DealCard";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
+import type { Deal, User } from "@shared/schema";
 
 export default function Sales() {
   const [view, setView] = useState<"kanban" | "list">("kanban");
+  const { toast } = useToast();
 
-  // todo: remove mock functionality
-  const deals = [
-    {
-      id: "1234",
-      clientName: "Александр Сергеев",
-      company: "ООО Интерьер Плюс",
-      amount: 450000,
-      deadline: "15.11.2025",
-      manager: "Мария Петрова",
-      tags: ["Кухня", "VIP"],
-      stage: "new",
-    },
-    {
-      id: "1235",
-      clientName: "Елена Иванова",
-      company: "ИП Иванова Е.А.",
-      amount: 280000,
-      deadline: "20.11.2025",
-      manager: "Иван Сидоров",
-      tags: ["Шкаф"],
-      stage: "new",
-    },
-    {
-      id: "1236",
-      clientName: "Дмитрий Ковалев",
-      company: "ООО Дизайн Студия",
-      amount: 620000,
-      deadline: "18.11.2025",
-      manager: "Мария Петрова",
-      tags: ["Гостиная", "Кухня"],
-      stage: "meeting",
-    },
-    {
-      id: "1237",
-      clientName: "Ольга Смирнова",
-      company: "ИП Смирнова О.В.",
-      amount: 185000,
-      deadline: "12.11.2025",
-      manager: "Иван Сидоров",
-      tags: ["Прихожая"],
-      stage: "proposal",
-    },
-  ];
+  const { data: deals = [], isLoading: dealsLoading, error: dealsError } = useQuery<Deal[]>({
+    queryKey: ["/api/deals"],
+  });
+
+  const { data: users = [], isLoading: usersLoading } = useQuery<User[]>({
+    queryKey: ["/api/users"],
+  });
+
+  if (dealsError) {
+    toast({
+      title: "Ошибка загрузки",
+      description: "Не удалось загрузить сделки",
+      variant: "destructive",
+    });
+  }
+
+  const isLoading = dealsLoading || usersLoading;
+
+  const getUserName = (userId: string | null) => {
+    if (!userId) return "Не назначен";
+    const user = users.find(u => u.id === userId);
+    return user?.full_name || user?.username || "Не назначен";
+  };
+
+  const formatDate = (date: Date | null) => {
+    if (!date) return "Не установлен";
+    return new Date(date).toLocaleDateString("ru-RU", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+  };
+
+  const transformedDeals = deals.map(deal => ({
+    id: deal.id,
+    clientName: deal.client_name,
+    company: deal.company || "",
+    amount: parseFloat(deal.amount || "0"),
+    deadline: formatDate(deal.deadline),
+    manager: getUserName(deal.manager_id),
+    tags: deal.tags || [],
+    stage: deal.stage,
+  }));
 
   const kanbanColumns = [
     {
       id: "new",
       title: "Новые",
-      count: deals.filter((d) => d.stage === "new").length,
-      items: deals
+      count: transformedDeals.filter((d) => d.stage === "new").length,
+      items: transformedDeals
         .filter((d) => d.stage === "new")
         .map((deal) => <DealCard key={deal.id} {...deal} />),
     },
     {
       id: "meeting",
       title: "Встреча назначена",
-      count: deals.filter((d) => d.stage === "meeting").length,
-      items: deals
+      count: transformedDeals.filter((d) => d.stage === "meeting").length,
+      items: transformedDeals
         .filter((d) => d.stage === "meeting")
         .map((deal) => <DealCard key={deal.id} {...deal} />),
     },
     {
       id: "proposal",
       title: "КП отправлено",
-      count: deals.filter((d) => d.stage === "proposal").length,
-      items: deals
+      count: transformedDeals.filter((d) => d.stage === "proposal").length,
+      items: transformedDeals
         .filter((d) => d.stage === "proposal")
         .map((deal) => <DealCard key={deal.id} {...deal} />),
     },
     {
       id: "contract",
       title: "Договор",
-      count: 0,
-      items: [],
+      count: transformedDeals.filter((d) => d.stage === "contract").length,
+      items: transformedDeals
+        .filter((d) => d.stage === "contract")
+        .map((deal) => <DealCard key={deal.id} {...deal} />),
     },
   ];
 
@@ -110,11 +117,17 @@ export default function Sales() {
         </div>
       </div>
 
-      {view === "kanban" ? (
+      {isLoading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <Skeleton key={i} className="h-64" data-testid={`skeleton-deal-${i}`} />
+          ))}
+        </div>
+      ) : view === "kanban" ? (
         <KanbanBoard columns={kanbanColumns} />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {deals.map((deal) => (
+          {transformedDeals.map((deal) => (
             <DealCard key={deal.id} {...deal} />
           ))}
         </div>

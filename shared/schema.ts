@@ -30,7 +30,8 @@ export const insertUserSchema = createInsertSchema(users).omit({
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
-export type User = typeof users.$inferSelect;
+export type UserWithPassword = typeof users.$inferSelect;
+export type User = Omit<UserWithPassword, 'password'>;
 
 export const deals = pgTable("deals", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

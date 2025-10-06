@@ -1,5 +1,6 @@
 import { 
   type User, 
+  type UserWithPassword,
   type InsertUser, 
   type Deal, 
   type InsertDeal, 
@@ -41,12 +42,14 @@ import {
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, asc, and, gte, lte, or, sql } from "drizzle-orm";
+import bcrypt from "bcrypt";
 
 export interface IStorage {
   // User methods
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  validatePassword(username: string, password: string): Promise<boolean>;
   
   // Deal methods
   getAllDeals(): Promise<Deal[]>;
@@ -141,17 +144,32 @@ export class DbStorage implements IStorage {
   // User methods
   async getUser(id: string): Promise<User | undefined> {
     const result = await db.select().from(users).where(eq(users.id, id));
-    return result[0];
+    if (!result[0]) return undefined;
+    const { password, ...userWithoutPassword } = result[0];
+    return userWithoutPassword;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
     const result = await db.select().from(users).where(eq(users.username, username));
-    return result[0];
+    if (!result[0]) return undefined;
+    const { password, ...userWithoutPassword } = result[0];
+    return userWithoutPassword;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const result = await db.insert(users).values(insertUser).returning();
-    return result[0];
+    const hashedPassword = await bcrypt.hash(insertUser.password, 10);
+    const result = await db.insert(users).values({
+      ...insertUser,
+      password: hashedPassword
+    }).returning();
+    const { password, ...userWithoutPassword } = result[0];
+    return userWithoutPassword;
+  }
+
+  async validatePassword(username: string, password: string): Promise<boolean> {
+    const result = await db.select().from(users).where(eq(users.username, username));
+    if (!result[0]) return false;
+    return await bcrypt.compare(password, result[0].password);
   }
 
   // Deal methods
@@ -729,15 +747,22 @@ export class DbStorage implements IStorage {
   }
 
   async getAllUsers(): Promise<User[]> {
-    return await db.select().from(users);
+    const result = await db.select().from(users);
+    return result.map(({ password, ...userWithoutPassword }) => userWithoutPassword);
   }
 
   async updateUser(id: string, data: Partial<InsertUser>): Promise<User | undefined> {
+    const updateData = { ...data };
+    if (updateData.password) {
+      updateData.password = await bcrypt.hash(updateData.password, 10);
+    }
     const result = await db.update(users)
-      .set(data)
+      .set(updateData)
       .where(eq(users.id, id))
       .returning();
-    return result[0];
+    if (!result[0]) return undefined;
+    const { password, ...userWithoutPassword } = result[0];
+    return userWithoutPassword;
   }
 
   async deleteUser(id: string): Promise<boolean> {

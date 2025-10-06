@@ -1,59 +1,63 @@
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Plus, Calendar } from "lucide-react";
 import { ProjectCard } from "@/components/ProjectCard";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
+import type { Project, ProjectStage, User } from "@shared/schema";
+
+type ProjectWithStages = Project & { stages: ProjectStage[] };
 
 export default function Projects() {
-  // todo: remove mock functionality
-  const projects = [
-    {
-      id: "567",
-      name: "Кухонный гарнитур Модерн",
-      client: "ООО Интерьер Плюс",
-      progress: 65,
-      status: "in_progress" as const,
-      deadline: "25.11.2025",
-      manager: "Петр Козлов",
-      stages: [
-        { name: "Замер", status: "completed" as const },
-        { name: "ТЗ", status: "completed" as const },
-        { name: "КД", status: "in_progress" as const },
-        { name: "Согласование", status: "pending" as const },
-        { name: "Закупка", status: "pending" as const },
-      ],
-    },
-    {
-      id: "568",
-      name: "Шкаф-купе 3м",
-      client: "ИП Иванова Е.А.",
-      progress: 30,
-      status: "pending" as const,
-      deadline: "30.11.2025",
-      manager: "Анна Волкова",
-      stages: [
-        { name: "Замер", status: "completed" as const },
-        { name: "ТЗ", status: "in_progress" as const },
-        { name: "КД", status: "pending" as const },
-        { name: "Закупка", status: "pending" as const },
-      ],
-    },
-    {
-      id: "569",
-      name: "Гостиная набор Люкс",
-      client: "ООО Дизайн Студия",
-      progress: 85,
-      status: "in_progress" as const,
-      deadline: "20.11.2025",
-      manager: "Петр Козлов",
-      stages: [
-        { name: "Замер", status: "completed" as const },
-        { name: "ТЗ", status: "completed" as const },
-        { name: "КД", status: "completed" as const },
-        { name: "Согласование", status: "completed" as const },
-        { name: "Закупка", status: "in_progress" as const },
-      ],
-    },
-  ];
+  const { toast } = useToast();
+
+  const { data: projects = [], isLoading: projectsLoading, error: projectsError } = useQuery<ProjectWithStages[]>({
+    queryKey: ["/api/projects"],
+  });
+
+  const { data: users = [], isLoading: usersLoading } = useQuery<User[]>({
+    queryKey: ["/api/users"],
+  });
+
+  if (projectsError) {
+    toast({
+      title: "Ошибка загрузки",
+      description: "Не удалось загрузить проекты",
+      variant: "destructive",
+    });
+  }
+
+  const isLoading = projectsLoading || usersLoading;
+
+  const getUserName = (userId: string | null) => {
+    if (!userId) return "Не назначен";
+    const user = users.find(u => u.id === userId);
+    return user?.full_name || user?.username || "Не назначен";
+  };
+
+  const formatDate = (date: Date | null) => {
+    if (!date) return "Не установлен";
+    return new Date(date).toLocaleDateString("ru-RU", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+  };
+
+  const transformedProjects = projects.map(project => ({
+    id: project.id,
+    name: project.name,
+    client: project.client_name,
+    progress: project.progress || 0,
+    status: project.status,
+    deadline: formatDate(project.deadline),
+    manager: getUserName(project.manager_id),
+    stages: project.stages.map(stage => ({
+      name: stage.name,
+      status: stage.status,
+    })),
+  }));
 
   return (
     <div className="space-y-6">
@@ -76,34 +80,58 @@ export default function Projects() {
 
       <Tabs defaultValue="all" className="w-full">
         <TabsList>
-          <TabsTrigger value="all">Все проекты ({projects.length})</TabsTrigger>
-          <TabsTrigger value="in_progress">В работе ({projects.filter(p => p.status === "in_progress").length})</TabsTrigger>
-          <TabsTrigger value="pending">Ожидают ({projects.filter(p => p.status === "pending").length})</TabsTrigger>
+          <TabsTrigger value="all">Все проекты ({transformedProjects.length})</TabsTrigger>
+          <TabsTrigger value="in_progress">В работе ({transformedProjects.filter(p => p.status === "in_progress").length})</TabsTrigger>
+          <TabsTrigger value="pending">Ожидают ({transformedProjects.filter(p => p.status === "pending").length})</TabsTrigger>
         </TabsList>
         <TabsContent value="all" className="mt-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {projects.map((project) => (
-              <ProjectCard key={project.id} {...project} />
-            ))}
-          </div>
+          {isLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-64" data-testid={`skeleton-project-${i}`} />
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {transformedProjects.map((project) => (
+                <ProjectCard key={project.id} {...project} />
+              ))}
+            </div>
+          )}
         </TabsContent>
         <TabsContent value="in_progress" className="mt-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {projects
-              .filter((p) => p.status === "in_progress")
-              .map((project) => (
-                <ProjectCard key={project.id} {...project} />
+          {isLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[1, 2].map((i) => (
+                <Skeleton key={i} className="h-64" data-testid={`skeleton-project-${i}`} />
               ))}
-          </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {transformedProjects
+                .filter((p) => p.status === "in_progress")
+                .map((project) => (
+                  <ProjectCard key={project.id} {...project} />
+                ))}
+            </div>
+          )}
         </TabsContent>
         <TabsContent value="pending" className="mt-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {projects
-              .filter((p) => p.status === "pending")
-              .map((project) => (
-                <ProjectCard key={project.id} {...project} />
+          {isLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[1].map((i) => (
+                <Skeleton key={i} className="h-64" data-testid={`skeleton-project-${i}`} />
               ))}
-          </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {transformedProjects
+                .filter((p) => p.status === "pending")
+                .map((project) => (
+                  <ProjectCard key={project.id} {...project} />
+                ))}
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </div>

@@ -1,3 +1,4 @@
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -6,15 +7,28 @@ import { Badge } from "@/components/ui/badge";
 import { UserAvatar } from "@/components/UserAvatar";
 import { Plus, Trash2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
+import type { User, CompanySettings } from "@shared/schema";
 
 export default function Settings() {
-  // todo: remove mock functionality
-  const users = [
-    { id: "1", name: "Иван Петров", role: "Директор", email: "i.petrov@emerald.ru", status: "active" },
-    { id: "2", name: "Мария Петрова", role: "Менеджер по продажам", email: "m.petrova@emerald.ru", status: "active" },
-    { id: "3", name: "Петр Козлов", role: "РОП", email: "p.kozlov@emerald.ru", status: "active" },
-    { id: "4", name: "Анна Волкова", role: "Конструктор", email: "a.volkova@emerald.ru", status: "active" },
-  ];
+  const { toast } = useToast();
+
+  const { data: users = [], isLoading: usersLoading, error: usersError } = useQuery<User[]>({
+    queryKey: ["/api/users"],
+  });
+
+  const { data: companySettings, isLoading: settingsLoading, error: settingsError } = useQuery<CompanySettings>({
+    queryKey: ["/api/settings/company"],
+  });
+
+  if (usersError || settingsError) {
+    toast({
+      title: "Ошибка загрузки",
+      description: "Не удалось загрузить настройки",
+      variant: "destructive",
+    });
+  }
 
   const roles = [
     "Директор",
@@ -58,29 +72,35 @@ export default function Settings() {
               <CardTitle className="text-lg">Сотрудники</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                {users.map((user) => (
-                  <div
-                    key={user.id}
-                    className="flex items-center justify-between p-3 rounded-md border hover-elevate"
-                    data-testid={`user-${user.id}`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <UserAvatar name={user.name} size="md" />
-                      <div>
-                        <p className="text-sm font-medium">{user.name}</p>
-                        <p className="text-xs text-muted-foreground">{user.email}</p>
+              {usersLoading ? (
+                <Skeleton className="h-64" />
+              ) : users.length === 0 ? (
+                <p className="text-center py-8 text-muted-foreground">Нет пользователей</p>
+              ) : (
+                <div className="space-y-3">
+                  {users.map((user) => (
+                    <div
+                      key={user.id}
+                      className="flex items-center justify-between p-3 rounded-md border hover-elevate"
+                      data-testid={`user-${user.id}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <UserAvatar name={user.full_name || user.username} size="md" />
+                        <div>
+                          <p className="text-sm font-medium">{user.full_name || user.username}</p>
+                          <p className="text-xs text-muted-foreground">{user.email || user.username}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Badge variant="secondary">{user.role || "Сотрудник"}</Badge>
+                        <Button variant="ghost" size="icon" data-testid={`button-delete-user-${user.id}`}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <Badge variant="secondary">{user.role}</Badge>
-                      <Button variant="ghost" size="icon" data-testid={`button-delete-user-${user.id}`}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -106,25 +126,47 @@ export default function Settings() {
               <CardTitle className="text-lg">Информация о компании</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="company-name">Название компании</Label>
-                  <Input id="company-name" defaultValue="Мебельная фабрика Emerald" data-testid="input-company-name" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="company-inn">ИНН</Label>
-                  <Input id="company-inn" defaultValue="7701234567" data-testid="input-company-inn" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="company-address">Адрес</Label>
-                  <Input id="company-address" defaultValue="г. Москва, ул. Производственная, 10" data-testid="input-company-address" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="company-phone">Телефон</Label>
-                  <Input id="company-phone" defaultValue="+7 (495) 123-45-67" data-testid="input-company-phone" />
-                </div>
-              </div>
-              <Button data-testid="button-save-company">Сохранить изменения</Button>
+              {settingsLoading ? (
+                <Skeleton className="h-64" />
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="company-name">Название компании</Label>
+                      <Input 
+                        id="company-name" 
+                        defaultValue={companySettings?.company_name || "Мебельная фабрика Emerald"} 
+                        data-testid="input-company-name" 
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="company-inn">ИНН</Label>
+                      <Input 
+                        id="company-inn" 
+                        defaultValue={companySettings?.inn || ""} 
+                        data-testid="input-company-inn" 
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="company-address">Адрес</Label>
+                      <Input 
+                        id="company-address" 
+                        defaultValue={companySettings?.address || ""} 
+                        data-testid="input-company-address" 
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="company-phone">Телефон</Label>
+                      <Input 
+                        id="company-phone" 
+                        defaultValue={companySettings?.phone || ""} 
+                        data-testid="input-company-phone" 
+                      />
+                    </div>
+                  </div>
+                  <Button data-testid="button-save-company">Сохранить изменения</Button>
+                </>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

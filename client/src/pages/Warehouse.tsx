@@ -1,10 +1,13 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Plus, QrCode, FileBarChart, Search, AlertTriangle, Package } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
 import {
   Table,
   TableBody,
@@ -13,93 +16,23 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import type { WarehouseItem } from "@shared/schema";
 
 export default function Warehouse() {
   const [searchQuery, setSearchQuery] = useState("");
+  const { toast } = useToast();
 
-  // todo: remove mock functionality
-  const items = [
-    {
-      id: "MAT001",
-      name: "МДФ 18мм белый",
-      quantity: 15,
-      unit: "листов",
-      location: "Склад А-12",
-      status: "critical" as const,
-      minStock: 20,
-      category: "materials",
-    },
-    {
-      id: "MAT002",
-      name: "Фурнитура Blum",
-      quantity: 45,
-      unit: "компл.",
-      location: "Склад Б-03",
-      status: "low" as const,
-      minStock: 30,
-      category: "materials",
-    },
-    {
-      id: "MAT003",
-      name: "Кромка ПВХ 2мм",
-      quantity: 250,
-      unit: "м.п.",
-      location: "Склад А-05",
-      status: "normal" as const,
-      minStock: 100,
-      category: "materials",
-    },
-    {
-      id: "MAT004",
-      name: "ДСП 16мм дуб",
-      quantity: 80,
-      unit: "листов",
-      location: "Склад А-15",
-      status: "normal" as const,
-      minStock: 40,
-      category: "materials",
-    },
-    {
-      id: "MAT005",
-      name: "ЛДСП 16мм венге",
-      quantity: 65,
-      unit: "листов",
-      location: "Склад А-15",
-      status: "normal" as const,
-      minStock: 40,
-      category: "materials",
-    },
-    {
-      id: "MAT006",
-      name: "Петли Hettich",
-      quantity: 120,
-      unit: "шт.",
-      location: "Склад Б-05",
-      status: "normal" as const,
-      minStock: 50,
-      category: "materials",
-    },
-    {
-      id: "PROD001",
-      name: "Кухонный фасад верхний",
-      quantity: 2,
-      unit: "шт.",
-      location: "Склад готовой продукции",
-      status: "normal" as const,
-      minStock: 0,
-      category: "products",
-    },
-    {
-      id: "PROD002",
-      name: "Столешница 3000мм",
-      quantity: 1,
-      unit: "шт.",
-      location: "Склад готовой продукции",
-      status: "normal" as const,
-      minStock: 0,
-      category: "products",
-    },
-  ];
+  const { data: items = [], isLoading, error } = useQuery<WarehouseItem[]>({
+    queryKey: ["/api/warehouse"],
+  });
+
+  if (error) {
+    toast({
+      title: "Ошибка загрузки",
+      description: "Не удалось загрузить данные склада",
+      variant: "destructive",
+    });
+  }
 
   const filteredItems = items.filter(
     (item) =>
@@ -116,7 +49,7 @@ export default function Warehouse() {
     return config[status];
   };
 
-  const renderTable = (itemsToRender: typeof items) => (
+  const renderTable = (itemsToRender: WarehouseItem[]) => (
     <Card>
       <CardContent className="p-0">
         <Table>
@@ -142,6 +75,8 @@ export default function Warehouse() {
             ) : (
               itemsToRender.map((item) => {
                 const statusConfig = getStatusBadge(item.status);
+                const quantity = parseFloat(item.quantity);
+                const minStock = parseFloat(item.min_stock || "0");
                 return (
                   <TableRow
                     key={item.id}
@@ -152,13 +87,13 @@ export default function Warehouse() {
                     <TableCell className="font-medium">{item.name}</TableCell>
                     <TableCell className="text-right">
                       <span className={item.status === "critical" || item.status === "low" ? "text-destructive font-semibold" : "font-semibold"}>
-                        {item.quantity}
+                        {quantity}
                       </span>
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm">{item.unit}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{item.location}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{item.location || "—"}</TableCell>
                     <TableCell className="text-right text-sm text-muted-foreground">
-                      {item.minStock} {item.unit}
+                      {minStock} {item.unit}
                     </TableCell>
                     <TableCell className="text-center">
                       <Badge variant={statusConfig.variant} className="gap-1 text-xs">
@@ -227,33 +162,45 @@ export default function Warehouse() {
       <Tabs defaultValue="all" className="w-full">
         <TabsList>
           <TabsTrigger value="all">
-            Все ({filteredItems.length})
+            Все товары ({filteredItems.length})
           </TabsTrigger>
           <TabsTrigger value="materials">
-            Материалы ({filteredItems.filter((i) => i.category === "materials").length})
+            Материалы ({filteredItems.filter(i => i.category === "materials").length})
           </TabsTrigger>
           <TabsTrigger value="products">
-            Готовая продукция ({filteredItems.filter((i) => i.category === "products").length})
+            Готовая продукция ({filteredItems.filter(i => i.category === "products").length})
           </TabsTrigger>
-          <TabsTrigger value="critical">
-            Критический остаток ({filteredItems.filter((i) => i.status === "critical").length})
+          <TabsTrigger value="alerts">
+            Требуют внимания ({filteredItems.filter(i => i.status === "low" || i.status === "critical").length})
           </TabsTrigger>
         </TabsList>
-
         <TabsContent value="all" className="mt-6">
-          {renderTable(filteredItems)}
+          {isLoading ? (
+            <Skeleton className="h-96" data-testid="skeleton-warehouse" />
+          ) : (
+            renderTable(filteredItems)
+          )}
         </TabsContent>
-
         <TabsContent value="materials" className="mt-6">
-          {renderTable(filteredItems.filter((i) => i.category === "materials"))}
+          {isLoading ? (
+            <Skeleton className="h-96" data-testid="skeleton-warehouse" />
+          ) : (
+            renderTable(filteredItems.filter(i => i.category === "materials"))
+          )}
         </TabsContent>
-
         <TabsContent value="products" className="mt-6">
-          {renderTable(filteredItems.filter((i) => i.category === "products"))}
+          {isLoading ? (
+            <Skeleton className="h-96" data-testid="skeleton-warehouse" />
+          ) : (
+            renderTable(filteredItems.filter(i => i.category === "products"))
+          )}
         </TabsContent>
-
-        <TabsContent value="critical" className="mt-6">
-          {renderTable(filteredItems.filter((i) => i.status === "critical"))}
+        <TabsContent value="alerts" className="mt-6">
+          {isLoading ? (
+            <Skeleton className="h-96" data-testid="skeleton-warehouse" />
+          ) : (
+            renderTable(filteredItems.filter(i => i.status === "low" || i.status === "critical"))
+          )}
         </TabsContent>
       </Tabs>
     </div>

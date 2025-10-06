@@ -1068,6 +1068,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
       
+      if (validationResult.data.password !== undefined && validationResult.data.password.trim() === "") {
+        res.status(400).json({ error: "Password cannot be empty" });
+        return;
+      }
+      
       const updatedUser = await storage.updateUser(id, validationResult.data);
       
       if (!updatedUser) {
