@@ -256,12 +256,12 @@ export function DealCreateDialog({ open, onOpenChange }: DealCreateDialogProps) 
                   <FormLabel>Сроки изготовления в рабочих днях</FormLabel>
                   <FormControl>
                     <Input 
-                      {...field} 
+                      value={field.value ?? ""}
                       type="number" 
                       min="1"
                       placeholder="Количество рабочих дней" 
                       data-testid="input-create-production-days"
-                      onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : "")}
+                      onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
                     />
                   </FormControl>
                   <FormMessage />
