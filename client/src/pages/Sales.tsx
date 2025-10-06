@@ -5,13 +5,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, LayoutGrid, List } from "lucide-react";
 import { KanbanBoard } from "@/components/KanbanBoard";
 import { DealCard } from "@/components/DealCard";
+import { DealDetailSheet } from "@/components/DealDetailSheet";
+import { DealCreateDialog } from "@/components/DealCreateDialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import type { Deal, User } from "@shared/schema";
 
 export default function Sales() {
   const [view, setView] = useState<"kanban" | "list">("kanban");
-  const [selectedDeal, setSelectedDeal] = useState<string | null>(null);
+  const [selectedDealId, setSelectedDealId] = useState<string | null>(null);
+  const [isDetailSheetOpen, setIsDetailSheetOpen] = useState(false);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const { toast } = useToast();
 
   const { data: deals = [], isLoading: dealsLoading, error: dealsError } = useQuery<Deal[]>({
@@ -59,11 +63,8 @@ export default function Sales() {
   }));
 
   const handleDealClick = (dealId: string) => {
-    setSelectedDeal(dealId);
-    toast({
-      title: "Просмотр заказа",
-      description: `Открытие карточки заказа #${dealId.substring(0, 8)}...`,
-    });
+    setSelectedDealId(dealId);
+    setIsDetailSheetOpen(true);
   };
 
   const kanbanColumns = [
