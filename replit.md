@@ -118,3 +118,162 @@ Preferred communication style: Simple, everyday language.
 - Material Design 3 principles adapted for ERP use case prioritizing information density
 - Module-based navigation reflecting business workflow stages
 - QR code integration for warehouse/production tracking (barcode system for physical inventory)
+
+## Responsive Design Guidelines
+
+The application is fully responsive and optimized for all device types: mobile phones (< 768px), tablets (768-1024px), and desktops (> 1024px). All future development MUST follow these guidelines to ensure consistent user experience across all devices.
+
+### Core Principles
+
+**1. Mobile-First Approach**
+- Design and implement features with mobile devices in mind first
+- Use Tailwind's responsive modifiers (md:, lg:, xl:) to enhance for larger screens
+- Test all new features on mobile viewport before considering them complete
+
+**2. Breakpoints**
+The system uses standard Tailwind breakpoints:
+- Mobile: < 768px (default, no prefix)
+- Tablet/Desktop: >= 768px (md: prefix)
+- Large Desktop: >= 1024px (lg: prefix)
+
+### Layout & Spacing Guidelines
+
+**Page Containers:**
+```tsx
+// Main content area - responsive padding
+<main className="p-4 md:p-6 bg-background">
+```
+
+**Header Sections:**
+```tsx
+// Page headers with title and actions
+<div className="flex items-center justify-between flex-wrap gap-4">
+  <div>
+    <h1 className="text-xl md:text-2xl font-semibold">Title</h1>
+    <p className="text-xs md:text-sm text-muted-foreground mt-1">Description</p>
+  </div>
+  <div className="flex items-center gap-2">
+    {/* Action buttons */}
+  </div>
+</div>
+```
+
+**Grid Systems:**
+```tsx
+// Always use responsive grid classes
+<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+```
+
+### Component Guidelines
+
+**Buttons:**
+```tsx
+// Mobile: icon only | Desktop: icon + text
+<>
+  <Button size="icon" className="md:hidden" data-testid="button-action">
+    <Plus className="h-4 w-4" />
+  </Button>
+  <Button className="hidden md:flex" data-testid="button-action-desktop">
+    <Plus className="h-4 w-4 mr-2" />
+    Action Text
+  </Button>
+</>
+```
+
+**TopBar Components:**
+- Search: Hidden in main view on mobile, accessible via Sheet/Dialog
+- User info: Hide text on mobile, show only avatar
+- Spacing: `px-4 md:px-6` for horizontal padding
+
+**Sidebar:**
+- Automatically handled by shadcn Sidebar component
+- Mobile: Drawer/Sheet overlay
+- Desktop: Collapsible sidebar with icon-only mode
+- Do NOT modify sidebar responsive behavior
+
+**Tabs:**
+```tsx
+// Always add horizontal scroll for tabs on mobile
+<TabsList className="overflow-x-auto">
+```
+
+**Cards & Data Display:**
+- Use `truncate` class for text that might overflow
+- Use `flex-1 min-w-0` for flex items containing truncated text
+- Ensure all cards work in single-column mobile layout
+
+**Kanban/Horizontal Scrolling:**
+```tsx
+// Responsive column widths with scroll snapping
+<div className="flex gap-4 overflow-x-auto snap-x snap-mandatory">
+  <div className="w-72 md:w-80 snap-start">
+```
+
+### Typography
+
+**Headings:**
+- h1: `text-xl md:text-2xl`
+- h2: `text-lg md:text-xl`
+- h3: `text-base md:text-lg`
+
+**Body Text:**
+- Regular: `text-sm md:text-base`
+- Small: `text-xs md:text-sm`
+- Description: `text-xs md:text-sm text-muted-foreground`
+
+### Data-TestID Requirements
+
+ALL interactive and meaningful elements MUST have data-testid attributes for testing:
+- Buttons: `data-testid="button-{action}"`
+- Inputs: `data-testid="input-{field}"`
+- Cards: `data-testid="card-{type}-{id}"`
+- Text displays: `data-testid="text-{content}"`
+
+For responsive variants, use same testid or add `-mobile`/`-desktop` suffix.
+
+### Testing Checklist
+
+Before marking any UI feature as complete:
+1. Test on mobile viewport (< 768px width in browser DevTools)
+2. Test on tablet viewport (768-1024px)
+3. Test on desktop viewport (> 1024px)
+4. Verify touch interactions work (buttons/links are easily tappable)
+5. Check text doesn't overflow or break layout
+6. Verify horizontal scrolling areas work smoothly
+7. Test with browser zoom at 150% and 200%
+
+### Common Patterns
+
+**Form Layouts:**
+```tsx
+// Stack on mobile, side-by-side on desktop
+<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+```
+
+**Stat Cards:**
+```tsx
+// 1 column mobile, 2-4 columns desktop
+<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+```
+
+**Modal/Sheet Usage:**
+- Mobile (< 768px): Prefer Sheet (drawer from bottom/side)
+- Desktop (>= 768px): Use Dialog (centered modal)
+- Use `useIsMobile()` hook to conditionally render
+
+### Performance Considerations
+
+- Minimize layout shifts between breakpoints
+- Use `flex-wrap` instead of hiding elements when possible
+- Avoid `display: none` for large elements; prefer conditional rendering
+- Use `overflow-x-auto` for horizontal content instead of breaking layout
+
+### DO NOT
+
+❌ Use fixed widths (w-[500px]) without responsive alternatives
+❌ Use fixed text sizes without responsive variants
+❌ Hide critical functionality on mobile without alternative
+❌ Forget to add data-testid attributes
+❌ Create custom sidebar/mobile menu - use shadcn Sidebar
+❌ Use nested scrolling containers (scroll within scroll)
+❌ Modify existing responsive patterns without testing all breakpoints

@@ -82,15 +82,24 @@ export default function Warehouse() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Склад</h1>
-          <p className="text-sm text-muted-foreground mt-1">Учет материалов и готовой продукции</p>
+          <h1 className="text-xl md:text-2xl font-semibold">Склад</h1>
+          <p className="text-xs md:text-sm text-muted-foreground mt-1">Учет материалов и готовой продукции</p>
         </div>
         <div className="flex items-center gap-2">
           <Button 
+            size="icon"
             onClick={() => setIsCreateDialogOpen(true)}
+            className="md:hidden"
             data-testid="button-create-warehouse-item"
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+          <Button 
+            onClick={() => setIsCreateDialogOpen(true)}
+            className="hidden md:flex"
+            data-testid="button-create-warehouse-item-desktop"
           >
             <Plus className="h-4 w-4 mr-2" />
             Новая позиция
@@ -98,7 +107,7 @@ export default function Warehouse() {
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 flex-wrap">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -110,7 +119,7 @@ export default function Warehouse() {
           />
         </div>
         <Tabs value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)} className="w-auto">
-          <TabsList>
+          <TabsList className="overflow-x-auto">
             <TabsTrigger value="all" data-testid="filter-status-all">
               Все
             </TabsTrigger>
@@ -128,7 +137,7 @@ export default function Warehouse() {
       </div>
 
       <Tabs defaultValue="all" className="w-full">
-        <TabsList>
+        <TabsList className="overflow-x-auto">
           <TabsTrigger value="all" data-testid="tab-category-all">
             Все ({filteredItems.length})
           </TabsTrigger>

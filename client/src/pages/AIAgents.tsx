@@ -24,15 +24,27 @@ export default function AIAgents() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">ИИ Агенты</h1>
-          <p className="text-sm text-muted-foreground mt-1">Автоматизация с помощью искусственного интеллекта</p>
+          <h1 className="text-xl md:text-2xl font-semibold">ИИ Агенты</h1>
+          <p className="text-xs md:text-sm text-muted-foreground mt-1">Автоматизация с помощью искусственного интеллекта</p>
         </div>
-        <Button data-testid="button-add-agent">
-          <Plus className="h-4 w-4 mr-2" />
-          Добавить агента
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button 
+            size="icon"
+            className="md:hidden"
+            data-testid="button-add-agent"
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+          <Button 
+            className="hidden md:flex"
+            data-testid="button-add-agent-desktop"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Добавить агента
+          </Button>
+        </div>
       </div>
 
       <Card className="bg-muted/50">

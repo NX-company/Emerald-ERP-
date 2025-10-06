@@ -92,17 +92,41 @@ export default function Production() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Производство</h1>
-          <p className="text-sm text-muted-foreground mt-1">Сменные задания и контроль этапов</p>
+          <h1 className="text-xl md:text-2xl font-semibold">Производство</h1>
+          <p className="text-xs md:text-sm text-muted-foreground mt-1">Сменные задания и контроль этапов</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" data-testid="button-scan-qr">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button 
+            variant="outline" 
+            size="icon"
+            className="md:hidden"
+            data-testid="button-scan-qr"
+          >
+            <QrCode className="h-4 w-4" />
+          </Button>
+          <Button 
+            variant="outline" 
+            className="hidden md:flex"
+            data-testid="button-scan-qr-desktop"
+          >
             <QrCode className="h-4 w-4 mr-2" />
             Сканировать QR
           </Button>
-          <Button onClick={handleCreateClick} data-testid="button-create-production">
+          <Button 
+            size="icon"
+            onClick={handleCreateClick} 
+            className="md:hidden"
+            data-testid="button-create-production"
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+          <Button 
+            onClick={handleCreateClick} 
+            className="hidden md:flex"
+            data-testid="button-create-production-desktop"
+          >
             <Plus className="h-4 w-4 mr-2" />
             Новое задание
           </Button>
@@ -110,7 +134,7 @@ export default function Production() {
       </div>
 
       <Tabs defaultValue="all" className="w-full">
-        <TabsList>
+        <TabsList className="overflow-x-auto">
           <TabsTrigger value="all" data-testid="tab-production-all">
             Все задания ({transformedTasks.length})
           </TabsTrigger>

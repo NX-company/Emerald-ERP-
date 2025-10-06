@@ -164,12 +164,12 @@ export default function Sales() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Продажи (CRM)</h1>
-          <p className="text-sm text-muted-foreground mt-1">Управление заказами клиентов</p>
+          <h1 className="text-xl md:text-2xl font-semibold">Продажи (CRM)</h1>
+          <p className="text-xs md:text-sm text-muted-foreground mt-1">Управление заказами клиентов</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Tabs value={view} onValueChange={(v) => setView(v as "kanban" | "list")}>
             <TabsList>
               <TabsTrigger value="kanban" data-testid="button-view-kanban">
@@ -182,13 +182,35 @@ export default function Sales() {
           </Tabs>
           <Button 
             variant="outline" 
+            size="icon"
             onClick={() => setIsManageStagesOpen(true)} 
+            className="md:hidden"
             data-testid="button-manage-stages"
+          >
+            <Settings className="h-4 w-4" />
+          </Button>
+          <Button 
+            variant="outline" 
+            onClick={() => setIsManageStagesOpen(true)} 
+            className="hidden md:flex"
+            data-testid="button-manage-stages-desktop"
           >
             <Settings className="h-4 w-4 mr-2" />
             Управление этапами
           </Button>
-          <Button onClick={() => setIsCreateDialogOpen(true)} data-testid="button-create-deal">
+          <Button 
+            size="icon"
+            onClick={() => setIsCreateDialogOpen(true)} 
+            className="md:hidden"
+            data-testid="button-create-deal"
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+          <Button 
+            onClick={() => setIsCreateDialogOpen(true)} 
+            className="hidden md:flex"
+            data-testid="button-create-deal-desktop"
+          >
             <Plus className="h-4 w-4 mr-2" />
             Новая сделка
           </Button>

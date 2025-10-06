@@ -77,7 +77,7 @@ function DroppableColumn({ id, title, count, color, items }: DroppableColumnProp
   const { setNodeRef } = useSortable({ id });
 
   return (
-    <div ref={setNodeRef} className="flex-shrink-0 w-80" data-testid={`column-${id}`}>
+    <div ref={setNodeRef} className="flex-shrink-0 w-72 md:w-80 snap-start" data-testid={`column-${id}`}>
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
@@ -135,7 +135,7 @@ export function KanbanBoard({
       onDragOver={onDragOver}
       onDragEnd={onDragEnd}
     >
-      <div className="flex gap-4 overflow-x-auto pb-4" data-testid="kanban-board">
+      <div className="flex gap-4 overflow-x-auto snap-x snap-mandatory pb-4" data-testid="kanban-board">
         <SortableContext items={allItemIds} strategy={verticalListSortingStrategy}>
           {columns.map((column) => (
             <DroppableColumn

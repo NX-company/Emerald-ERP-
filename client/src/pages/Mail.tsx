@@ -45,17 +45,39 @@ export default function Mail() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Почта</h1>
-          <p className="text-sm text-muted-foreground mt-1">Интеграция с email-аккаунтами</p>
+          <h1 className="text-xl md:text-2xl font-semibold">Почта</h1>
+          <p className="text-xs md:text-sm text-muted-foreground mt-1">Интеграция с email-аккаунтами</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" data-testid="button-connect-email">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button 
+            variant="outline" 
+            size="icon"
+            className="md:hidden"
+            data-testid="button-connect-email"
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+          <Button 
+            variant="outline" 
+            className="hidden md:flex"
+            data-testid="button-connect-email-desktop"
+          >
             <Plus className="h-4 w-4 mr-2" />
             Подключить почту
           </Button>
-          <Button data-testid="button-compose">
+          <Button 
+            size="icon"
+            className="md:hidden"
+            data-testid="button-compose"
+          >
+            <MailIcon className="h-4 w-4" />
+          </Button>
+          <Button 
+            className="hidden md:flex"
+            data-testid="button-compose-desktop"
+          >
             <MailIcon className="h-4 w-4 mr-2" />
             Написать
           </Button>

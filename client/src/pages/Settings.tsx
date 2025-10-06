@@ -50,24 +50,36 @@ export default function Settings() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Настройки</h1>
-        <p className="text-sm text-muted-foreground mt-1">Управление системой и пользователями</p>
+        <h1 className="text-xl md:text-2xl font-semibold">Настройки</h1>
+        <p className="text-xs md:text-sm text-muted-foreground mt-1">Управление системой и пользователями</p>
       </div>
 
       <Tabs defaultValue="users" className="w-full">
-        <TabsList>
+        <TabsList className="overflow-x-auto">
           <TabsTrigger value="users">Пользователи</TabsTrigger>
           <TabsTrigger value="company">Компания</TabsTrigger>
           <TabsTrigger value="integrations">Интеграции</TabsTrigger>
         </TabsList>
 
         <TabsContent value="users" className="mt-6 space-y-6">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">Управление пользователями и их правами доступа</p>
-            <Button data-testid="button-invite-user">
-              <Plus className="h-4 w-4 mr-2" />
-              Пригласить пользователя
-            </Button>
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <p className="text-xs md:text-sm text-muted-foreground">Управление пользователями и их правами доступа</p>
+            <div className="flex items-center gap-2">
+              <Button 
+                size="icon"
+                className="md:hidden"
+                data-testid="button-invite-user"
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+              <Button 
+                className="hidden md:flex"
+                data-testid="button-invite-user-desktop"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Пригласить пользователя
+              </Button>
+            </div>
           </div>
 
           <Card>

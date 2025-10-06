@@ -56,19 +56,31 @@ export default function Tasks() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Задачи</h1>
-          <p className="text-sm text-muted-foreground mt-1">Управление задачами и подзадачами</p>
+          <h1 className="text-xl md:text-2xl font-semibold">Задачи</h1>
+          <p className="text-xs md:text-sm text-muted-foreground mt-1">Управление задачами и подзадачами</p>
         </div>
-        <Button data-testid="button-create-task">
-          <Plus className="h-4 w-4 mr-2" />
-          Новая задача
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button 
+            size="icon"
+            className="md:hidden"
+            data-testid="button-create-task"
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+          <Button 
+            className="hidden md:flex"
+            data-testid="button-create-task-desktop"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Новая задача
+          </Button>
+        </div>
       </div>
 
       <Tabs defaultValue="active" className="w-full">
-        <TabsList>
+        <TabsList className="overflow-x-auto">
           <TabsTrigger value="active">
             Активные ({transformedTasks.filter((t) => !t.completed).length})
           </TabsTrigger>

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Bell, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,13 +14,23 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 
 export function TopBar() {
+  const [searchOpen, setSearchOpen] = useState(false);
+
   return (
-    <header className="sticky top-0 z-50 flex h-16 items-center gap-4 border-b bg-background px-6">
+    <header className="sticky top-0 z-50 flex h-16 items-center gap-2 md:gap-4 border-b bg-background px-4 md:px-6">
       <SidebarTrigger data-testid="button-sidebar-toggle" />
       
-      <div className="flex-1 flex items-center gap-4">
+      {/* Desktop Search - visible on md and above */}
+      <div className="hidden md:flex flex-1 items-center gap-4">
         <div className="relative w-full max-w-md">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -31,7 +42,44 @@ export function TopBar() {
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
+      {/* Mobile Search Button - visible only on small screens */}
+      <div className="flex md:hidden flex-1 items-center">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="hover-elevate active-elevate-2"
+          onClick={() => setSearchOpen(true)}
+          data-testid="button-mobile-search"
+        >
+          <Search className="h-5 w-5" />
+        </Button>
+      </div>
+
+      {/* Mobile Search Sheet */}
+      <Sheet open={searchOpen} onOpenChange={setSearchOpen}>
+        <SheetContent side="top" className="w-full">
+          <SheetHeader>
+            <SheetTitle>Поиск</SheetTitle>
+            <SheetDescription>
+              Поиск по всей системе
+            </SheetDescription>
+          </SheetHeader>
+          <div className="mt-4">
+            <div className="relative w-full">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Поиск по системе..."
+                className="pl-9"
+                data-testid="input-search-mobile"
+                autoFocus
+              />
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      <div className="flex items-center gap-1 md:gap-2">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button 
