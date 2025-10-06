@@ -24,6 +24,9 @@ export const users = pgTable("users", {
   full_name: text("full_name"),
   role: text("role"),
   phone: text("phone"),
+  can_create_deals: boolean("can_create_deals").default(true).notNull(),
+  can_edit_deals: boolean("can_edit_deals").default(true).notNull(),
+  can_delete_deals: boolean("can_delete_deals").default(true).notNull(),
   created_at: timestamp("created_at").defaultNow().notNull(),
 });
 
