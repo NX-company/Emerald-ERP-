@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -26,8 +25,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { X, Plus, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { insertDealSchema, type User } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -38,7 +36,6 @@ interface DealCreateDialogProps {
 }
 
 export function DealCreateDialog({ open, onOpenChange }: DealCreateDialogProps) {
-  const [newTag, setNewTag] = useState("");
   const { toast } = useToast();
 
   const { data: users = [] } = useQuery<User[]>({
