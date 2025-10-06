@@ -51,7 +51,7 @@ export function DealCreateDialog({ open, onOpenChange }: DealCreateDialogProps) 
       stage: "new" as const,
       deadline: "",
       manager_id: "",
-      tags: [] as string[],
+      production_days_count: "",
     },
   });
 
@@ -63,7 +63,7 @@ export function DealCreateDialog({ open, onOpenChange }: DealCreateDialogProps) 
         company: data.company || null,
         deadline: data.deadline ? new Date(data.deadline).toISOString() : null,
         manager_id: data.manager_id || null,
-        tags: data.tags.length > 0 ? data.tags : null,
+        production_days_count: data.production_days_count ? parseInt(data.production_days_count) : null,
       };
       await apiRequest("POST", "/api/deals", dealData);
     },
@@ -88,19 +88,6 @@ export function DealCreateDialog({ open, onOpenChange }: DealCreateDialogProps) 
   const handleSubmit = form.handleSubmit((data) => {
     createMutation.mutate(data);
   });
-
-  const handleAddTag = () => {
-    if (newTag.trim()) {
-      const currentTags = form.getValues("tags") || [];
-      form.setValue("tags", [...currentTags, newTag.trim()]);
-      setNewTag("");
-    }
-  };
-
-  const handleRemoveTag = (index: number) => {
-    const currentTags = form.getValues("tags") || [];
-    form.setValue("tags", currentTags.filter((_, i) => i !== index));
-  };
 
   const stageLabels: Record<string, string> = {
     new: "Новые",
@@ -265,54 +252,19 @@ export function DealCreateDialog({ open, onOpenChange }: DealCreateDialogProps) 
 
             <FormField
               control={form.control}
-              name="tags"
+              name="production_days_count"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Теги</FormLabel>
-                  <div className="space-y-2">
-                    <div className="flex gap-2">
-                      <Input
-                        value={newTag}
-                        onChange={(e) => setNewTag(e.target.value)}
-                        placeholder="Добавить тег"
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            handleAddTag();
-                          }
-                        }}
-                        data-testid="input-create-new-tag"
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        onClick={handleAddTag}
-                        data-testid="button-create-add-tag"
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {field.value?.map((tag, index) => (
-                        <Badge 
-                          key={index} 
-                          variant="secondary"
-                          data-testid={`tag-create-${index}`}
-                        >
-                          {tag}
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveTag(index)}
-                            className="ml-1 hover:text-destructive"
-                            data-testid={`button-create-remove-tag-${index}`}
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
+                  <FormLabel>Сроки изготовления в рабочих днях</FormLabel>
+                  <FormControl>
+                    <Input 
+                      {...field} 
+                      type="number" 
+                      min="1"
+                      placeholder="Количество рабочих дней" 
+                      data-testid="input-create-production-days"
+                    />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}

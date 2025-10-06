@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -38,13 +38,15 @@ export default function Sales() {
     queryKey: ["/api/deal-stages"],
   });
 
-  if (dealsError) {
-    toast({
-      title: "Ошибка загрузки",
-      description: "Не удалось загрузить сделки",
-      variant: "destructive",
-    });
-  }
+  useEffect(() => {
+    if (dealsError) {
+      toast({
+        title: "Ошибка загрузки",
+        description: "Не удалось загрузить сделки",
+        variant: "destructive",
+      });
+    }
+  }, [dealsError, toast]);
 
   const isLoading = dealsLoading || usersLoading || stagesLoading;
 
@@ -70,7 +72,7 @@ export default function Sales() {
     amount: parseFloat(deal.amount || "0"),
     deadline: formatDate(deal.deadline),
     manager: getUserName(deal.manager_id),
-    tags: deal.tags || [],
+    tags: [],
     stage: deal.stage,
   }));
 
