@@ -9,7 +9,13 @@ export default function Production() {
     {
       id: "301",
       itemName: "Кухонный фасад верхний",
-      stage: "Раскрой",
+      stages: [
+        { name: "Раскрой", status: "completed" as const },
+        { name: "Кромка", status: "completed" as const },
+        { name: "Фрезеровка", status: "completed" as const },
+        { name: "Покраска", status: "completed" as const },
+        { name: "Сборка", status: "completed" as const },
+      ],
       progress: 100,
       worker: "Андрей Кузнецов",
       payment: 3500,
@@ -20,7 +26,12 @@ export default function Production() {
     {
       id: "302",
       itemName: "Столешница 3000мм",
-      stage: "Фрезеровка",
+      stages: [
+        { name: "Раскрой", status: "completed" as const },
+        { name: "Фрезеровка", status: "in_progress" as const },
+        { name: "Полировка", status: "pending" as const },
+        { name: "Упаковка", status: "pending" as const },
+      ],
       progress: 45,
       worker: "Михаил Соколов",
       payment: 5000,
@@ -31,7 +42,13 @@ export default function Production() {
     {
       id: "303",
       itemName: "Дверца шкафа-купе",
-      stage: "Покраска",
+      stages: [
+        { name: "Раскрой", status: "completed" as const },
+        { name: "Кромка", status: "completed" as const },
+        { name: "Покраска", status: "in_progress" as const },
+        { name: "Сушка", status: "pending" as const },
+        { name: "Упаковка", status: "pending" as const },
+      ],
       progress: 20,
       worker: "Дмитрий Попов",
       payment: 4200,
@@ -42,7 +59,11 @@ export default function Production() {
     {
       id: "304",
       itemName: "Полка навесная",
-      stage: "Сборка",
+      stages: [
+        { name: "Раскрой", status: "pending" as const },
+        { name: "Кромка", status: "pending" as const },
+        { name: "Сборка", status: "pending" as const },
+      ],
       progress: 0,
       worker: "Сергей Морозов",
       payment: 2800,
