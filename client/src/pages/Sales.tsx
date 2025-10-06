@@ -2,14 +2,16 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, LayoutGrid, List, Settings } from "lucide-react";
+import { Plus, LayoutGrid, List, Settings, Trash2, CheckSquare } from "lucide-react";
 import { KanbanBoard } from "@/components/KanbanBoard";
 import { DealCard } from "@/components/DealCard";
 import { DealDetailSheet } from "@/components/DealDetailSheet";
 import { DealCreateDialog } from "@/components/DealCreateDialog";
 import { ManageStagesDialog } from "@/components/ManageStagesDialog";
 import { DealCardModal } from "@/components/DealCardModal";
+import { DeleteDealDialog } from "@/components/DeleteDealDialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import type { Deal, User, DealStage } from "@shared/schema";
 import { DragStartEvent, DragOverEvent, DragEndEvent } from "@dnd-kit/core";
@@ -24,6 +26,9 @@ export default function Sales() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [selectedDealId, setSelectedDealId] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedDeals, setSelectedDeals] = useState<Set<string>>(new Set());
+  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
   const { toast } = useToast();
 
   const { data: deals = [], isLoading: dealsLoading, error: dealsError } = useQuery<Deal[]>({
@@ -36,6 +41,10 @@ export default function Sales() {
 
   const { data: stages = [], isLoading: stagesLoading } = useQuery<DealStage[]>({
     queryKey: ["/api/deal-stages"],
+  });
+
+  const { data: currentUser } = useQuery<User>({
+    queryKey: ['/api/users', 'c2fdd40b-dadf-4fbb-848a-74283d14802e'],
   });
 
   useEffect(() => {
@@ -93,6 +102,54 @@ export default function Sales() {
       });
     },
   });
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (dealIds: string[]) => {
+      return await apiRequest("POST", "/api/deals/bulk-delete?userId=c2fdd40b-dadf-4fbb-848a-74283d14802e", { dealIds });
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/deals"] });
+      toast({
+        title: "Сделки удалены",
+        description: data.message || `Удалено ${selectedDeals.size} сделок`,
+      });
+      setSelectedDeals(new Set());
+      setSelectionMode(false);
+      setBulkDeleteDialogOpen(false);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Ошибка",
+        description: error.message || "Не удалось удалить сделки",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleToggleSelection = (dealId: string) => {
+    setSelectedDeals(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(dealId)) {
+        newSet.delete(dealId);
+      } else {
+        newSet.add(dealId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleSelectAll = () => {
+    if (selectedDeals.size === transformedDeals.length) {
+      setSelectedDeals(new Set());
+    } else {
+      setSelectedDeals(new Set(transformedDeals.map(d => d.id)));
+    }
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedDeals.size === 0) return;
+    setBulkDeleteDialogOpen(true);
+  };
 
   const handleDealClick = (dealId: string) => {
     setSelectedDealId(dealId);
@@ -173,50 +230,98 @@ export default function Sales() {
           <p className="text-xs md:text-sm text-muted-foreground mt-1">Управление заказами клиентов</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <Tabs value={view} onValueChange={(v) => setView(v as "kanban" | "list")}>
-            <TabsList>
-              <TabsTrigger value="kanban" data-testid="button-view-kanban">
-                <LayoutGrid className="h-4 w-4" />
-              </TabsTrigger>
-              <TabsTrigger value="list" data-testid="button-view-list">
-                <List className="h-4 w-4" />
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-          <Button 
-            variant="outline" 
-            size="icon"
-            onClick={() => setIsManageStagesOpen(true)} 
-            className="md:hidden"
-            data-testid="button-manage-stages"
-          >
-            <Settings className="h-4 w-4" />
-          </Button>
-          <Button 
-            variant="outline" 
-            onClick={() => setIsManageStagesOpen(true)} 
-            className="hidden md:flex"
-            data-testid="button-manage-stages-desktop"
-          >
-            <Settings className="h-4 w-4 mr-2" />
-            Управление этапами
-          </Button>
-          <Button 
-            size="icon"
-            onClick={() => setIsCreateDialogOpen(true)} 
-            className="md:hidden"
-            data-testid="button-create-deal"
-          >
-            <Plus className="h-4 w-4" />
-          </Button>
-          <Button 
-            onClick={() => setIsCreateDialogOpen(true)} 
-            className="hidden md:flex"
-            data-testid="button-create-deal-desktop"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Новая сделка
-          </Button>
+          {!selectionMode && (
+            <>
+              <Tabs value={view} onValueChange={(v) => setView(v as "kanban" | "list")}>
+                <TabsList>
+                  <TabsTrigger value="kanban" data-testid="button-view-kanban">
+                    <LayoutGrid className="h-4 w-4" />
+                  </TabsTrigger>
+                  <TabsTrigger value="list" data-testid="button-view-list">
+                    <List className="h-4 w-4" />
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+              <Button 
+                variant="outline" 
+                size="icon"
+                onClick={() => setIsManageStagesOpen(true)} 
+                className="md:hidden"
+                data-testid="button-manage-stages"
+              >
+                <Settings className="h-4 w-4" />
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => setIsManageStagesOpen(true)} 
+                className="hidden md:flex"
+                data-testid="button-manage-stages-desktop"
+              >
+                <Settings className="h-4 w-4 mr-2" />
+                Управление этапами
+              </Button>
+              {currentUser?.can_delete_deals && view === "list" && (
+                <Button 
+                  variant="outline" 
+                  onClick={() => setSelectionMode(true)} 
+                  data-testid="button-enable-selection"
+                >
+                  <CheckSquare className="h-4 w-4 mr-2" />
+                  <span className="hidden md:inline">Выбрать</span>
+                </Button>
+              )}
+              {currentUser?.can_create_deals && (
+                <>
+                  <Button 
+                    size="icon"
+                    onClick={() => setIsCreateDialogOpen(true)} 
+                    className="md:hidden"
+                    data-testid="button-create-deal"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                  <Button 
+                    onClick={() => setIsCreateDialogOpen(true)} 
+                    className="hidden md:flex"
+                    data-testid="button-create-deal-desktop"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Новая сделка
+                  </Button>
+                </>
+              )}
+            </>
+          )}
+          {selectionMode && (
+            <>
+              <Button 
+                variant="outline" 
+                onClick={handleSelectAll}
+                data-testid="button-select-all"
+              >
+                {selectedDeals.size === transformedDeals.length ? "Снять все" : "Выбрать все"}
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setSelectionMode(false);
+                  setSelectedDeals(new Set());
+                }}
+                data-testid="button-cancel-selection"
+              >
+                Отмена
+              </Button>
+              <Button 
+                variant="destructive"
+                onClick={handleBulkDelete}
+                disabled={selectedDeals.size === 0}
+                data-testid="button-bulk-delete"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Удалить ({selectedDeals.size})
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -238,7 +343,22 @@ export default function Sales() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {transformedDeals.map((deal) => (
-            <DealCard key={deal.id} {...deal} onClick={() => handleDealClick(deal.id)} />
+            <div key={deal.id} className="relative">
+              {selectionMode && (
+                <div className="absolute top-2 left-2 z-10">
+                  <Checkbox
+                    checked={selectedDeals.has(deal.id)}
+                    onCheckedChange={() => handleToggleSelection(deal.id)}
+                    data-testid={`checkbox-deal-${deal.id}`}
+                    className="bg-background"
+                  />
+                </div>
+              )}
+              <DealCard 
+                {...deal} 
+                onClick={() => !selectionMode && handleDealClick(deal.id)} 
+              />
+            </div>
           ))}
         </div>
       )}
@@ -263,6 +383,14 @@ export default function Sales() {
         dealId={selectedDealId}
         open={modalOpen}
         onOpenChange={setModalOpen}
+      />
+
+      <DeleteDealDialog
+        open={bulkDeleteDialogOpen}
+        onOpenChange={setBulkDeleteDialogOpen}
+        onConfirm={() => bulkDeleteMutation.mutate(Array.from(selectedDeals))}
+        dealName={`${selectedDeals.size} ${selectedDeals.size === 1 ? 'сделку' : selectedDeals.size < 5 ? 'сделки' : 'сделок'}`}
+        isPending={bulkDeleteMutation.isPending}
       />
     </div>
   );
