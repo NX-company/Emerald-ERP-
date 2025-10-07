@@ -216,6 +216,7 @@ export default function ProcessTemplates() {
       }
 
       queryClient.invalidateQueries({ queryKey: ["/api/templates"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/templates", selectedTemplateId] });
       toast({ description: "Этапы сохранены" });
       setShowStagesDialog(false);
       setSelectedTemplateId(null);
