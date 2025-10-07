@@ -33,6 +33,7 @@ Preferred communication style: Simple, everyday language.
 
 **Database**: PostgreSQL (Neon serverless), connection pooling.
 **Schema Design**: Core entities (users, deals, projects, etc.) with foreign key relationships, enums for controlled vocabularies, UUID primary keys, and audit timestamps.
+**Projects Module Schema**: Enhanced for project management with Gantt charts - includes project_items (furniture positions from invoices), extended project_stages (with assignee, dates, cost, description), stage_dependencies (for workflow dependencies), process_templates & template_stages (reusable process templates), stage_messages (stage-level chat), projects.invoice_id (link to source invoice).
 **File Storage**: Document management tracks metadata in DB; actual file storage through Replit Object Storage with ACL-based access control.
 
 ## External Dependencies

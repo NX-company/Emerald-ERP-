@@ -87,6 +87,7 @@ export const projects = pgTable("projects", {
   name: text("name").notNull(),
   client_name: text("client_name").notNull(),
   deal_id: varchar("deal_id").references(() => deals.id),
+  invoice_id: varchar("invoice_id").references(() => deal_documents.id),
   status: statusEnum("status").notNull().default("pending"),
   progress: integer("progress").default(0),
   deadline: timestamp("deadline"),
@@ -104,11 +105,39 @@ export const insertProjectSchema = createInsertSchema(projects).omit({
 export type InsertProject = z.infer<typeof insertProjectSchema>;
 export type Project = typeof projects.$inferSelect;
 
+export const project_items = pgTable("project_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  project_id: varchar("project_id").references(() => projects.id, { onDelete: "cascade" }).notNull(),
+  name: text("name").notNull(),
+  article: text("article"),
+  quantity: integer("quantity").notNull().default(1),
+  price: numeric("price", { precision: 12, scale: 2 }),
+  source_document_id: varchar("source_document_id").references(() => deal_documents.id),
+  order: integer("order").notNull(),
+  created_at: timestamp("created_at").defaultNow().notNull(),
+  updated_at: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertProjectItemSchema = createInsertSchema(project_items).omit({
+  id: true,
+  created_at: true,
+  updated_at: true,
+});
+
+export type InsertProjectItem = z.infer<typeof insertProjectItemSchema>;
+export type ProjectItem = typeof project_items.$inferSelect;
+
 export const project_stages = pgTable("project_stages", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   project_id: varchar("project_id").references(() => projects.id).notNull(),
+  item_id: varchar("item_id").references(() => project_items.id),
   name: text("name").notNull(),
   status: statusEnum("status").notNull().default("pending"),
+  assignee_id: varchar("assignee_id").references(() => users.id),
+  start_date: timestamp("start_date"),
+  end_date: timestamp("end_date"),
+  cost: numeric("cost", { precision: 12, scale: 2 }),
+  description: text("description"),
   order: integer("order").notNull(),
   created_at: timestamp("created_at").defaultNow().notNull(),
   updated_at: timestamp("updated_at").defaultNow().notNull(),
@@ -401,3 +430,89 @@ export const insertDealCustomFieldSchema = createInsertSchema(deal_custom_fields
 
 export type InsertDealCustomField = z.infer<typeof insertDealCustomFieldSchema>;
 export type DealCustomField = typeof deal_custom_fields.$inferSelect;
+
+export const stage_dependencies = pgTable("stage_dependencies", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  stage_id: varchar("stage_id").references(() => project_stages.id, { onDelete: "cascade" }).notNull(),
+  depends_on_stage_id: varchar("depends_on_stage_id").references(() => project_stages.id, { onDelete: "cascade" }).notNull(),
+  created_at: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertStageDependencySchema = createInsertSchema(stage_dependencies).omit({
+  id: true,
+  created_at: true,
+});
+
+export type InsertStageDependency = z.infer<typeof insertStageDependencySchema>;
+export type StageDependency = typeof stage_dependencies.$inferSelect;
+
+export const process_templates = pgTable("process_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  created_by: varchar("created_by").references(() => users.id),
+  is_active: boolean("is_active").default(true).notNull(),
+  created_at: timestamp("created_at").defaultNow().notNull(),
+  updated_at: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertProcessTemplateSchema = createInsertSchema(process_templates).omit({
+  id: true,
+  created_at: true,
+  updated_at: true,
+});
+
+export type InsertProcessTemplate = z.infer<typeof insertProcessTemplateSchema>;
+export type ProcessTemplate = typeof process_templates.$inferSelect;
+
+export const template_stages = pgTable("template_stages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  template_id: varchar("template_id").references(() => process_templates.id, { onDelete: "cascade" }).notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  duration_days: integer("duration_days"),
+  cost: numeric("cost", { precision: 12, scale: 2 }),
+  order: integer("order").notNull(),
+  created_at: timestamp("created_at").defaultNow().notNull(),
+  updated_at: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertTemplateStageSchema = createInsertSchema(template_stages).omit({
+  id: true,
+  created_at: true,
+  updated_at: true,
+});
+
+export type InsertTemplateStage = z.infer<typeof insertTemplateStageSchema>;
+export type TemplateStage = typeof template_stages.$inferSelect;
+
+export const template_dependencies = pgTable("template_dependencies", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  template_stage_id: varchar("template_stage_id").references(() => template_stages.id, { onDelete: "cascade" }).notNull(),
+  depends_on_template_stage_id: varchar("depends_on_template_stage_id").references(() => template_stages.id, { onDelete: "cascade" }).notNull(),
+  created_at: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertTemplateDependencySchema = createInsertSchema(template_dependencies).omit({
+  id: true,
+  created_at: true,
+});
+
+export type InsertTemplateDependency = z.infer<typeof insertTemplateDependencySchema>;
+export type TemplateDependency = typeof template_dependencies.$inferSelect;
+
+export const stage_messages = pgTable("stage_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  stage_id: varchar("stage_id").references(() => project_stages.id, { onDelete: "cascade" }).notNull(),
+  user_id: varchar("user_id").references(() => users.id).notNull(),
+  message: text("message").notNull(),
+  created_at: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertStageMessageSchema = createInsertSchema(stage_messages).omit({
+  id: true,
+  created_at: true,
+});
+
+export type InsertStageMessage = z.infer<typeof insertStageMessageSchema>;
+export type StageMessage = typeof stage_messages.$inferSelect;
