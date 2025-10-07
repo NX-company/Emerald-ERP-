@@ -44,7 +44,7 @@ export default function ProcessTemplates() {
   // Create template mutation
   const createMutation = useMutation({
     mutationFn: async (data: { name: string; description?: string; is_active: boolean }) => {
-      return await apiRequest("/api/templates", "POST", data);
+      return await apiRequest("POST", "/api/templates", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/templates"] });
@@ -59,7 +59,7 @@ export default function ProcessTemplates() {
   // Update template mutation
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<ProcessTemplate> }) => {
-      return await apiRequest(`/api/templates/${id}`, "PUT", data);
+      return await apiRequest("PUT", `/api/templates/${id}`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/templates"] });
@@ -74,7 +74,7 @@ export default function ProcessTemplates() {
   // Delete template mutation
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      return await apiRequest(`/api/templates/${id}`, "DELETE");
+      return await apiRequest("DELETE", `/api/templates/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/templates"] });
@@ -173,29 +173,30 @@ export default function ProcessTemplates() {
       
       // Delete all existing stages (cascade will delete dependencies)
       for (const stage of existingStages) {
-        await apiRequest(`/api/templates/stages/${stage.id}`, "DELETE");
+        await apiRequest("DELETE", `/api/templates/stages/${stage.id}`);
       }
 
       // Create new stages
       const createdStages: Record<string, string> = {};
       for (const stage of stages) {
-        const response: any = await apiRequest(
-          `/api/templates/${selectedTemplateId}/stages`,
+        const response = await apiRequest(
           "POST",
+          `/api/templates/${selectedTemplateId}/stages`,
           {
             name: stage.name,
             duration_days: stage.duration_days,
             order: stage.order_index,
           }
         );
-        createdStages[stage.id] = response.id;
+        const data = await response.json();
+        createdStages[stage.id] = data.id;
       }
 
       // Create dependencies with new IDs
       for (const dep of dependencies) {
         await apiRequest(
-          `/api/templates/${selectedTemplateId}/dependencies`,
           "POST",
+          `/api/templates/${selectedTemplateId}/dependencies`,
           {
             template_stage_id: createdStages[dep.stage_id],
             depends_on_template_stage_id: createdStages[dep.depends_on_stage_id],
