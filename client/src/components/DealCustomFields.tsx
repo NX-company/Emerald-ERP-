@@ -170,7 +170,7 @@ export function DealCustomFields({ dealId }: DealCustomFieldsProps) {
               <SelectValue placeholder="Выберите значение" />
             </SelectTrigger>
             <SelectContent>
-              {definition.options.map((option) => (
+              {definition.options.filter(Boolean).map((option) => (
                 <SelectItem key={option} value={option}>
                   {option}
                 </SelectItem>
