@@ -92,6 +92,18 @@ router.post("/api/projects/from-invoice", async (req, res) => {
       invoiceId: z.string(),
       selectedPositions: z.array(z.number()).optional(),
       editedPositions: z.array(z.any()).optional(),
+      positionStagesData: z.record(z.object({
+        stages: z.array(z.object({
+          id: z.string(),
+          name: z.string(),
+          duration_days: z.number(),
+          order_index: z.number(),
+        })),
+        dependencies: z.array(z.object({
+          stage_id: z.string(),
+          depends_on_stage_id: z.string(),
+        })),
+      })).optional(),
     });
 
     const validationResult = requestSchema.safeParse(req.body);
@@ -102,7 +114,7 @@ router.post("/api/projects/from-invoice", async (req, res) => {
       return;
     }
 
-    const { dealId, invoiceId, selectedPositions, editedPositions } = validationResult.data;
+    const { dealId, invoiceId, selectedPositions, editedPositions, positionStagesData } = validationResult.data;
 
     const deal = await salesRepository.getDealById(dealId);
     if (!deal) {
@@ -133,7 +145,8 @@ router.post("/api/projects/from-invoice", async (req, res) => {
       deal, 
       invoice,
       selectedPositions,
-      editedPositions
+      editedPositions,
+      positionStagesData
     );
     res.status(201).json(project);
   } catch (error) {
