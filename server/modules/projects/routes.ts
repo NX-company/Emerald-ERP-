@@ -90,6 +90,7 @@ router.post("/api/projects/from-invoice", async (req, res) => {
     const requestSchema = z.object({
       dealId: z.string(),
       invoiceId: z.string(),
+      selectedPositions: z.array(z.number()).optional(),
     });
 
     const validationResult = requestSchema.safeParse(req.body);
@@ -100,7 +101,7 @@ router.post("/api/projects/from-invoice", async (req, res) => {
       return;
     }
 
-    const { dealId, invoiceId } = validationResult.data;
+    const { dealId, invoiceId, selectedPositions } = validationResult.data;
 
     const deal = await salesRepository.getDealById(dealId);
     if (!deal) {
@@ -125,7 +126,13 @@ router.post("/api/projects/from-invoice", async (req, res) => {
       return;
     }
 
-    const project = await projectsRepository.createProjectFromInvoice(dealId, invoiceId, deal, invoice);
+    const project = await projectsRepository.createProjectFromInvoice(
+      dealId, 
+      invoiceId, 
+      deal, 
+      invoice,
+      selectedPositions
+    );
     res.status(201).json(project);
   } catch (error) {
     console.error("Error creating project from invoice:", error);

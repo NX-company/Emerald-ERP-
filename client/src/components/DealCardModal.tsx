@@ -12,6 +12,7 @@ import { ru } from "date-fns/locale";
 import { apiRequest, queryClient, getCurrentUserId } from "@/lib/queryClient";
 import { DocumentFormDialog } from "@/components/DocumentFormDialog";
 import { DeleteDealDialog } from "@/components/DeleteDealDialog";
+import { CreateProjectDialog } from "@/components/CreateProjectDialog";
 import { useToast } from "@/hooks/use-toast";
 import type { Deal, DealMessage, InsertDealMessage, DealDocument, User, DealStage, DealAttachment, Project } from "@shared/schema";
 import { ObjectUploader } from "@/components/ObjectUploader";
@@ -66,6 +67,7 @@ export function DealCardModal({ dealId, open, onOpenChange }: DealCardModalProps
   const [contractDialogOpen, setContractDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [allDocumentsDialogOpen, setAllDocumentsDialogOpen] = useState(false);
+  const [createProjectDialogOpen, setCreateProjectDialogOpen] = useState(false);
   const [editingDocumentId, setEditingDocumentId] = useState<string | undefined>();
   
   const { toast } = useToast();
@@ -162,11 +164,12 @@ export function DealCardModal({ dealId, open, onOpenChange }: DealCardModalProps
     },
   });
 
-  const createProjectFromInvoice = useMutation<Project, Error, string>({
-    mutationFn: async (invoiceId: string) => {
+  const createProjectFromInvoice = useMutation<Project, Error, { invoiceId: string; selectedPositions: number[] }>({
+    mutationFn: async ({ invoiceId, selectedPositions }) => {
       const response = await apiRequest('POST', '/api/projects/from-invoice', {
         dealId,
         invoiceId,
+        selectedPositions,
       });
       return response as unknown as Project;
     },
@@ -177,6 +180,7 @@ export function DealCardModal({ dealId, open, onOpenChange }: DealCardModalProps
         title: "Проект создан",
         description: "Проект успешно создан из счёта",
       });
+      setCreateProjectDialogOpen(false);
       onOpenChange(false);
       setLocation(`/projects/${project.id}`);
     },
@@ -593,12 +597,11 @@ export function DealCardModal({ dealId, open, onOpenChange }: DealCardModalProps
                   <Button 
                     variant="outline"
                     className="w-full justify-start gap-2"
-                    onClick={() => createProjectFromInvoice.mutate(invoices[0].id)}
-                    disabled={createProjectFromInvoice.isPending}
+                    onClick={() => setCreateProjectDialogOpen(true)}
                     data-testid="button-create-project"
                   >
                     <Plus className="w-4 h-4" />
-                    {createProjectFromInvoice.isPending ? "Создание..." : "Создать проект"}
+                    Создать проект
                   </Button>
                 </>
               )}
@@ -671,6 +674,26 @@ export function DealCardModal({ dealId, open, onOpenChange }: DealCardModalProps
         onOpenChange={setAllDocumentsDialogOpen}
         documents={documents}
         isLoading={documentsLoading}
+      />
+
+      <CreateProjectDialog
+        open={createProjectDialogOpen}
+        onOpenChange={setCreateProjectDialogOpen}
+        invoicePositions={
+          invoices.length > 0 && invoices[0].data && typeof invoices[0].data === 'object' && 'positions' in invoices[0].data && Array.isArray((invoices[0].data as any).positions)
+            ? (invoices[0].data as any).positions
+            : []
+        }
+        onCreateProject={(selectedPositions) => {
+          if (invoices.length > 0) {
+            createProjectFromInvoice.mutate({
+              invoiceId: invoices[0].id,
+              selectedPositions,
+            });
+          }
+        }}
+        isPending={createProjectFromInvoice.isPending}
+        dealName={deal?.client_name || ""}
       />
     </Dialog>
   );

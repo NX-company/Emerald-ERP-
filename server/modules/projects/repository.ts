@@ -133,7 +133,13 @@ export class ProjectsRepository {
     return result[0];
   }
 
-  async createProjectFromInvoice(dealId: string, invoiceId: string, deal: any, invoice: any): Promise<Project> {
+  async createProjectFromInvoice(
+    dealId: string, 
+    invoiceId: string, 
+    deal: any, 
+    invoice: any, 
+    selectedPositionIndices?: number[]
+  ): Promise<Project> {
     const projectData: InsertProject = {
       name: `Проект №${invoice.name}`,
       client_name: deal.client_name,
@@ -148,16 +154,28 @@ export class ProjectsRepository {
     const project = await this.createProject(projectData);
 
     if (invoice.data?.positions && Array.isArray(invoice.data.positions)) {
-      const itemsData: InsertProjectItem[] = invoice.data.positions.map((position: any, index: number) => ({
+      let positionsToAdd = invoice.data.positions;
+      
+      // Если указаны индексы позиций, фильтруем только выбранные
+      if (selectedPositionIndices && selectedPositionIndices.length > 0) {
+        positionsToAdd = invoice.data.positions.filter((_: any, index: number) => 
+          selectedPositionIndices.includes(index)
+        );
+      }
+
+      const itemsData: InsertProjectItem[] = positionsToAdd.map((position: any, index: number) => ({
         project_id: project.id,
         name: position.name,
+        article: position.article || undefined,
         quantity: position.quantity || 1,
         price: position.price,
         source_document_id: invoiceId,
         order: index,
       }));
 
-      await db.insert(project_items).values(itemsData);
+      if (itemsData.length > 0) {
+        await db.insert(project_items).values(itemsData);
+      }
     }
 
     return project;
