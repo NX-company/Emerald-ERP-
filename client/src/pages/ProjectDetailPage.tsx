@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { ProjectItemDialog } from "@/components/ProjectItemDialog";
 import { StageDialog } from "@/components/StageDialog";
+import { StageFlowEditor } from "@/components/StageFlowEditor";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -630,58 +631,11 @@ export default function ProjectDetailPage() {
                   </p>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between gap-4 flex-wrap">
-                    <h3 className="text-lg font-semibold" data-testid="text-stages-title">
-                      Этапы для позиции: {selectedItem.name}
-                    </h3>
-                    <Button
-                      onClick={handleAddStage}
-                      data-testid="button-add-stage"
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      Добавить этап
-                    </Button>
-                  </div>
-
-                  <Separator />
-
-                  {stagesLoading ? (
-                    <div className="space-y-3">
-                      {[1, 2, 3].map((i) => (
-                        <Skeleton key={i} className="h-40" data-testid={`skeleton-stage-${i}`} />
-                      ))}
-                    </div>
-                  ) : sortedStages.length === 0 ? (
-                    <div className="text-center py-12 space-y-2">
-                      <Layers className="w-12 h-12 mx-auto text-muted-foreground" />
-                      <p className="text-sm text-muted-foreground" data-testid="text-empty-stages">
-                        Этапов пока нет
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Добавьте первый этап или примените шаблон процесса
-                      </p>
-                    </div>
-                  ) : (
-                    <DndContext onDragEnd={handleDragEnd} collisionDetection={closestCenter}>
-                      <SortableContext items={sortedStages.map((s) => s.id)} strategy={verticalListSortingStrategy}>
-                        <div className="space-y-3" data-testid="list-stages">
-                          {sortedStages.map((stage) => (
-                            <StageCard
-                              key={stage.id}
-                              stage={stage}
-                              users={users}
-                              onEdit={handleEditStage}
-                              onDelete={handleDeleteStage}
-                              formatDate={formatDate}
-                              formatCurrency={formatCurrency}
-                            />
-                          ))}
-                        </div>
-                      </SortableContext>
-                    </DndContext>
-                  )}
-                </div>
+                <StageFlowEditor
+                  projectId={id}
+                  itemId={selectedItem.id}
+                  itemName={selectedItem.name}
+                />
               )}
             </TabsContent>
 
