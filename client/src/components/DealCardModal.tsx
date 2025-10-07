@@ -13,7 +13,7 @@ import { apiRequest, queryClient, getCurrentUserId } from "@/lib/queryClient";
 import { DocumentFormDialog } from "@/components/DocumentFormDialog";
 import { DeleteDealDialog } from "@/components/DeleteDealDialog";
 import { useToast } from "@/hooks/use-toast";
-import type { Deal, DealMessage, InsertDealMessage, DealDocument, User } from "@shared/schema";
+import type { Deal, DealMessage, InsertDealMessage, DealDocument, User, DealStage } from "@shared/schema";
 
 interface DealCardModalProps {
   dealId: string | null;
@@ -35,6 +35,11 @@ export function DealCardModal({ dealId, open, onOpenChange }: DealCardModalProps
   const { data: documents = [], isLoading: documentsLoading } = useQuery<DealDocument[]>({
     queryKey: ['/api/deals', dealId, 'documents'],
     enabled: !!dealId && open,
+  });
+
+  const { data: stages = [] } = useQuery<DealStage[]>({
+    queryKey: ['/api/deal-stages'],
+    enabled: open,
   });
 
   const [messageText, setMessageText] = useState("");
@@ -97,6 +102,27 @@ export function DealCardModal({ dealId, open, onOpenChange }: DealCardModalProps
     },
   });
 
+  const updateStage = useMutation({
+    mutationFn: async (stage: string) => {
+      return await apiRequest('PUT', `/api/deals/${dealId}`, { stage });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/deals', dealId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/deals'] });
+      toast({
+        title: "Этап обновлён",
+        description: "Этап сделки успешно изменён",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Ошибка",
+        description: error.message || "Не удалось обновить этап",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleSendMessage = () => {
     if (!messageText.trim()) return;
     createMessage.mutate({
@@ -144,8 +170,23 @@ export function DealCardModal({ dealId, open, onOpenChange }: DealCardModalProps
 
                   {/* Этап */}
                   <div className="mb-4">
-                    <p className="text-sm text-muted-foreground mb-1">Этап</p>
-                    <Badge data-testid="badge-stage">{deal.stage}</Badge>
+                    <p className="text-sm text-muted-foreground mb-2">Этап</p>
+                    <Select
+                      value={deal.stage}
+                      onValueChange={(value) => updateStage.mutate(value)}
+                      disabled={updateStage.isPending}
+                    >
+                      <SelectTrigger className="w-full" data-testid="select-stage">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {stages.map((stage) => (
+                          <SelectItem key={stage.id} value={stage.key}>
+                            {stage.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <Separator className="my-4" />
