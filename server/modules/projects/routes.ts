@@ -96,7 +96,6 @@ router.post("/api/projects/from-invoice", async (req, res) => {
         stages: z.array(z.object({
           id: z.string(),
           name: z.string(),
-          duration_days: z.number(),
           order_index: z.number(),
         })),
         dependencies: z.array(z.object({

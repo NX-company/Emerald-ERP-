@@ -147,7 +147,6 @@ export default function ProcessTemplates() {
       const localStages: LocalStage[] = data.stages.map((s: any) => ({
         id: s.id,
         name: s.name,
-        duration_days: s.duration_days || 7,
         order_index: s.order,
       }));
 
@@ -184,7 +183,6 @@ export default function ProcessTemplates() {
           `/api/templates/${selectedTemplateId}/stages`,
           {
             name: stage.name,
-            duration_days: stage.duration_days,
             order: stage.order_index,
           }
         );

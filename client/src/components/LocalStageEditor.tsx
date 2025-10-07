@@ -10,7 +10,6 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 export interface LocalStage {
   id: string;
   name: string;
-  duration_days: number;
   order_index: number;
 }
 
@@ -35,7 +34,6 @@ export function LocalStageEditor({
   onDependenciesChange
 }: LocalStageEditorProps) {
   const [newStageName, setNewStageName] = useState("");
-  const [newStageDuration, setNewStageDuration] = useState("7");
 
   const handleAddStage = () => {
     if (!newStageName.trim()) return;
@@ -43,13 +41,11 @@ export function LocalStageEditor({
     const newStage: LocalStage = {
       id: `temp-${Date.now()}`,
       name: newStageName,
-      duration_days: parseInt(newStageDuration) || 7,
       order_index: stages.length,
     };
 
     onStagesChange([...stages, newStage]);
     setNewStageName("");
-    setNewStageDuration("7");
   };
 
   const handleDeleteStage = (id: string) => {
@@ -175,15 +171,6 @@ export function LocalStageEditor({
                         data-testid={`input-stage-name-${index}`}
                       />
                     </div>
-                    <div className="w-24">
-                      <Input
-                        type="number"
-                        value={stage.duration_days}
-                        onChange={(e) => handleUpdateStage(stage.id, 'duration_days', parseInt(e.target.value) || 1)}
-                        placeholder="Дней"
-                        data-testid={`input-stage-duration-${index}`}
-                      />
-                    </div>
                     <Button
                       type="button"
                       size="icon"
@@ -273,14 +260,6 @@ export function LocalStageEditor({
             placeholder="Название этапа"
             onKeyDown={(e) => e.key === 'Enter' && handleAddStage()}
             data-testid="input-new-stage-name"
-          />
-          <Input
-            type="number"
-            value={newStageDuration}
-            onChange={(e) => setNewStageDuration(e.target.value)}
-            placeholder="Дней"
-            className="w-20"
-            data-testid="input-new-stage-duration"
           />
           <Button
             type="button"

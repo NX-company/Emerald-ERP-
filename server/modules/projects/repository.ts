@@ -141,7 +141,7 @@ export class ProjectsRepository {
     selectedPositionIndices?: number[],
     editedPositions?: any[],
     positionStagesData?: Record<string, { 
-      stages: { id: string; name: string; duration_days: number; order_index: number }[]; 
+      stages: { id: string; name: string; order_index: number }[]; 
       dependencies: { stage_id: string; depends_on_stage_id: string }[] 
     }>
   ): Promise<Project> {
@@ -244,7 +244,7 @@ export class ProjectsRepository {
   private async createStagesWithDependencies(
     projectId: string, 
     itemId: string, 
-    stages: { id: string; name: string; duration_days: number; order_index: number }[],
+    stages: { id: string; name: string; order_index: number }[],
     dependencies: { stage_id: string; depends_on_stage_id: string }[]
   ): Promise<void> {
     // Карта для сопоставления временных ID с реальными ID этапов

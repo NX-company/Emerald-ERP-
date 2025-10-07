@@ -189,8 +189,6 @@ export function CreateProjectDialog({
       const localStages: LocalStage[] = stages.map((stage: any) => ({
         id: stageIdMap[stage.id],
         name: stage.name,
-        description: stage.description || "",
-        duration_days: stage.duration_days || 0,
         order_index: stage.order,
       }));
 
