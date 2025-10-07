@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { Deal, DealMessage, InsertDealMessage, DealDocument, User, DealStage, DealAttachment } from "@shared/schema";
 import { ObjectUploader } from "@/components/ObjectUploader";
 import { DealCustomFields } from "@/components/DealCustomFields";
+import { AllDocumentsDialog } from "@/components/AllDocumentsDialog";
 import type { UploadResult } from "@uppy/core";
 import { X, Download } from "lucide-react";
 
@@ -58,6 +59,7 @@ export function DealCardModal({ dealId, open, onOpenChange }: DealCardModalProps
   const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
   const [contractDialogOpen, setContractDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [allDocumentsDialogOpen, setAllDocumentsDialogOpen] = useState(false);
   const [editingDocumentId, setEditingDocumentId] = useState<string | undefined>();
   
   const { toast } = useToast();
@@ -546,6 +548,7 @@ export function DealCardModal({ dealId, open, onOpenChange }: DealCardModalProps
               <Button 
                 variant="outline" 
                 className="w-full justify-start gap-2"
+                onClick={() => setAllDocumentsDialogOpen(true)}
                 data-testid="button-all-documents"
               >
                 <FolderOpen className="w-4 h-4" />
@@ -613,6 +616,13 @@ export function DealCardModal({ dealId, open, onOpenChange }: DealCardModalProps
           queryClient.invalidateQueries({ queryKey: ['/api/deals', dealId, 'documents'] });
           setEditingDocumentId(undefined);
         }}
+      />
+
+      <AllDocumentsDialog
+        open={allDocumentsDialogOpen}
+        onOpenChange={setAllDocumentsDialogOpen}
+        documents={documents}
+        isLoading={documentsLoading}
       />
     </Dialog>
   );
