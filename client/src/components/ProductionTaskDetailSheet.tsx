@@ -296,14 +296,14 @@ export function ProductionTaskDetailSheet({ task, open, onOpenChange }: Producti
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Проект</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || undefined}>
+                    <Select onValueChange={(value) => field.onChange(value === "none" ? null : value)} value={field.value || "none"}>
                       <FormControl>
                         <SelectTrigger data-testid="select-production-project">
                           <SelectValue placeholder="Выберите проект (опционально)" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="" data-testid="option-production-project-none">
+                        <SelectItem value="none" data-testid="option-production-project-none">
                           Без проекта
                         </SelectItem>
                         {projects.map((project) => (

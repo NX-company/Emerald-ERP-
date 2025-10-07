@@ -224,14 +224,14 @@ export function FinanceCreateTransactionDialog({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Проект (опционально)</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value || undefined}>
+                  <Select onValueChange={(value) => field.onChange(value === "none" ? null : value)} value={field.value || "none"}>
                     <FormControl>
                       <SelectTrigger data-testid="select-finance-project">
                         <SelectValue placeholder="Выберите проект" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="" data-testid="option-finance-project-none">
+                      <SelectItem value="none" data-testid="option-finance-project-none">
                         Без проекта
                       </SelectItem>
                       {projects.map((project) => (

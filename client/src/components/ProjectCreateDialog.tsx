@@ -152,14 +152,14 @@ export function ProjectCreateDialog({ open, onOpenChange }: ProjectCreateDialogP
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Сделка</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value || undefined}>
+                  <Select onValueChange={(value) => field.onChange(value === "none" ? null : value)} value={field.value || "none"}>
                     <FormControl>
                       <SelectTrigger data-testid="select-create-project-deal">
                         <SelectValue placeholder="Выберите сделку (опционально)" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="" data-testid="option-create-project-deal-none">
+                      <SelectItem value="none" data-testid="option-create-project-deal-none">
                         Без сделки
                       </SelectItem>
                       {deals.map((deal) => (
