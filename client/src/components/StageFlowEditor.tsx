@@ -2,13 +2,15 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, Link2, X } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Plus, Trash2, Link2, X, Eye } from "lucide-react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { ProjectStage, StageDependency } from "@shared/schema";
 import { StageDialog } from "./StageDialog";
 import { StatusBadge } from "./StatusBadge";
+import { StageDetailView } from "./StageDetailView";
 
 interface StagePosition {
   id: string;
@@ -28,6 +30,7 @@ export function StageFlowEditor({ projectId, itemId, itemName }: StageFlowEditor
   const [draggingStage, setDraggingStage] = useState<string | null>(null);
   const [linkingMode, setLinkingMode] = useState<string | null>(null);
   const [stageDialogOpen, setStageDialogOpen] = useState(false);
+  const [selectedStage, setSelectedStage] = useState<ProjectStage | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const { data: stages = [], isLoading } = useQuery<ProjectStage[]>({
@@ -278,6 +281,18 @@ export function StageFlowEditor({ projectId, itemId, itemName }: StageFlowEditor
                       className="h-6 w-6"
                       onClick={(e) => {
                         e.stopPropagation();
+                        setSelectedStage(stage);
+                      }}
+                      data-testid={`button-view-details-${stage.id}`}
+                    >
+                      <Eye className="w-3 h-3" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-6 w-6"
+                      onClick={(e) => {
+                        e.stopPropagation();
                         setLinkingMode(stage.id);
                       }}
                       data-testid={`button-link-stage-${stage.id}`}
@@ -319,6 +334,24 @@ export function StageFlowEditor({ projectId, itemId, itemName }: StageFlowEditor
         projectId={projectId}
         itemId={itemId}
       />
+
+      <Dialog open={!!selectedStage} onOpenChange={(open) => !open && setSelectedStage(null)}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Детали этапа</DialogTitle>
+          </DialogHeader>
+          {selectedStage && (
+            <StageDetailView
+              stageId={selectedStage.id}
+              stageName={selectedStage.name}
+              stageStatus={selectedStage.status}
+              stageDescription={selectedStage.description || undefined}
+              stageDeadline={selectedStage.end_date ? selectedStage.end_date.toString() : undefined}
+              stageCost={selectedStage.cost || undefined}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

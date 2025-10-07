@@ -41,11 +41,12 @@ interface StageCardProps {
   users: User[];
   onEdit: (stage: ProjectStage) => void;
   onDelete: (stageId: string) => void;
+  onViewDetails: (stage: ProjectStage) => void;
   formatDate: (date: Date | null) => string;
   formatCurrency: (amount: string | null) => string;
 }
 
-function StageCard({ stage, users, onEdit, onDelete, formatDate, formatCurrency }: StageCardProps) {
+function StageCard({ stage, users, onEdit, onDelete, onViewDetails, formatDate, formatCurrency }: StageCardProps) {
   const {
     attributes,
     listeners,
@@ -152,42 +153,15 @@ function StageCard({ stage, users, onEdit, onDelete, formatDate, formatCurrency 
               <Trash2 className="w-3 h-3 mr-1" />
               Удалить
             </Button>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    disabled
-                    data-testid={`button-documents-stage-${stage.id}`}
-                  >
-                    <FileText className="w-3 h-3 mr-1" />
-                    Документы
-                  </Button>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Будет доступно позже</p>
-              </TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    disabled
-                    data-testid={`button-chat-stage-${stage.id}`}
-                  >
-                    <MessageSquare className="w-3 h-3 mr-1" />
-                    Чат
-                  </Button>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Будет доступно позже</p>
-              </TooltipContent>
-            </Tooltip>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => onViewDetails(stage)}
+              data-testid={`button-view-details-${stage.id}`}
+            >
+              <MessageSquare className="w-3 h-3 mr-1" />
+              Детали
+            </Button>
           </div>
         </div>
       </div>

@@ -44,7 +44,6 @@ export function LocalStageEditor({
   users = []
 }: LocalStageEditorProps) {
   const [newStageName, setNewStageName] = useState("");
-  const [expandedStage, setExpandedStage] = useState<string | null>(null);
 
   const handleAddStage = () => {
     if (!newStageName.trim()) return;
@@ -65,7 +64,6 @@ export function LocalStageEditor({
       .map((s, index) => ({ ...s, order_index: index }));
     onStagesChange(updatedStages);
 
-    // Удалить все зависимости, связанные с этим этапом
     if (onDependenciesChange) {
       const updatedDeps = dependencies.filter(
         d => d.stage_id !== id && d.depends_on_stage_id !== id
@@ -84,7 +82,6 @@ export function LocalStageEditor({
   const handleAddDependency = (stageId: string, dependsOnStageId: string) => {
     if (!onDependenciesChange) return;
     
-    // Проверить, что зависимость не существует
     const exists = dependencies.some(
       d => d.stage_id === stageId && d.depends_on_stage_id === dependsOnStageId
     );
@@ -132,7 +129,6 @@ export function LocalStageEditor({
         </p>
       </div>
 
-      {/* Список этапов с прокруткой */}
       <ScrollArea className="h-[240px] pr-3">
         <div className="space-y-2">
           {stages.length === 0 ? (
@@ -186,15 +182,6 @@ export function LocalStageEditor({
                       type="button"
                       size="icon"
                       variant="ghost"
-                      onClick={() => setExpandedStage(expandedStage === stage.id ? null : stage.id)}
-                      data-testid={`button-expand-${index}`}
-                    >
-                      <ChevronDown className={`w-4 h-4 transition-transform ${expandedStage === stage.id ? 'rotate-180' : ''}`} />
-                    </Button>
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant="ghost"
                       onClick={() => handleDeleteStage(stage.id)}
                       data-testid={`button-delete-stage-${index}`}
                     >
@@ -202,75 +189,72 @@ export function LocalStageEditor({
                     </Button>
                   </div>
 
-                  {expandedStage === stage.id && (
-                    <div className="grid grid-cols-2 gap-2 pl-12 pt-2">
-                      <div>
-                        <Label className="text-xs">Срок (дни)</Label>
-                        <Input
-                          type="number"
-                          value={stage.duration_days || ''}
-                          onChange={(e) => handleUpdateStage(stage.id, 'duration_days', parseInt(e.target.value) || 0)}
-                          placeholder="7"
-                          className="h-8"
-                          data-testid={`input-duration-${index}`}
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-xs">Стоимость</Label>
-                        <Input
-                          type="number"
-                          value={stage.cost || ''}
-                          onChange={(e) => handleUpdateStage(stage.id, 'cost', parseFloat(e.target.value) || 0)}
-                          placeholder="0"
-                          className="h-8"
-                          data-testid={`input-cost-${index}`}
-                        />
-                      </div>
-                      {mode === 'template' ? (
-                        <div className="col-span-2">
-                          <Label className="text-xs">Роль исполнителя</Label>
-                          <Input
-                            value={stage.assignee_role || ''}
-                            onChange={(e) => handleUpdateStage(stage.id, 'assignee_role', e.target.value)}
-                            placeholder="Например: Столяр"
-                            className="h-8"
-                            data-testid={`input-assignee-role-${index}`}
-                          />
-                        </div>
-                      ) : (
-                        <div className="col-span-2">
-                          <Label className="text-xs">Исполнитель</Label>
-                          <Select
-                            value={stage.assignee_id || ''}
-                            onValueChange={(value) => handleUpdateStage(stage.id, 'assignee_id', value)}
-                          >
-                            <SelectTrigger className="h-8" data-testid={`select-assignee-${index}`}>
-                              <SelectValue placeholder="Выбрать исполнителя" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {users.map(u => (
-                                <SelectItem key={u.id} value={u.id}>
-                                  {u.full_name || u.username}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      )}
-                      <div className="col-span-2">
-                        <Label className="text-xs">Описание</Label>
-                        <Textarea
-                          value={stage.description || ''}
-                          onChange={(e) => handleUpdateStage(stage.id, 'description', e.target.value)}
-                          placeholder="Детали выполнения этапа"
-                          className="h-16 text-xs"
-                          data-testid={`textarea-description-${index}`}
-                        />
-                      </div>
+                  <div className="grid grid-cols-2 gap-2 pl-12 pt-2">
+                    <div>
+                      <Label className="text-xs">Срок (дни)</Label>
+                      <Input
+                        type="number"
+                        value={stage.duration_days || ''}
+                        onChange={(e) => handleUpdateStage(stage.id, 'duration_days', parseInt(e.target.value) || 0)}
+                        placeholder="7"
+                        className="h-8"
+                        data-testid={`input-duration-${index}`}
+                      />
                     </div>
-                  )}
+                    <div>
+                      <Label className="text-xs">Стоимость</Label>
+                      <Input
+                        type="number"
+                        value={stage.cost || ''}
+                        onChange={(e) => handleUpdateStage(stage.id, 'cost', parseFloat(e.target.value) || 0)}
+                        placeholder="0"
+                        className="h-8"
+                        data-testid={`input-cost-${index}`}
+                      />
+                    </div>
+                    {mode === 'template' ? (
+                      <div className="col-span-2">
+                        <Label className="text-xs">Роль исполнителя</Label>
+                        <Input
+                          value={stage.assignee_role || ''}
+                          onChange={(e) => handleUpdateStage(stage.id, 'assignee_role', e.target.value)}
+                          placeholder="Например: Столяр"
+                          className="h-8"
+                          data-testid={`input-assignee-role-${index}`}
+                        />
+                      </div>
+                    ) : (
+                      <div className="col-span-2">
+                        <Label className="text-xs">Исполнитель</Label>
+                        <Select
+                          value={stage.assignee_id || ''}
+                          onValueChange={(value) => handleUpdateStage(stage.id, 'assignee_id', value)}
+                        >
+                          <SelectTrigger className="h-8" data-testid={`select-assignee-${index}`}>
+                            <SelectValue placeholder="Выбрать исполнителя" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {users.map(u => (
+                              <SelectItem key={u.id} value={u.id}>
+                                {u.full_name || u.username}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                    <div className="col-span-2">
+                      <Label className="text-xs">Описание</Label>
+                      <Textarea
+                        value={stage.description || ''}
+                        onChange={(e) => handleUpdateStage(stage.id, 'description', e.target.value)}
+                        placeholder="Детали выполнения этапа"
+                        className="h-16 text-xs"
+                        data-testid={`textarea-description-${index}`}
+                      />
+                    </div>
+                  </div>
 
-                  {/* Зависимости */}
                   {onDependenciesChange && (
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
@@ -338,7 +322,6 @@ export function LocalStageEditor({
         </div>
       </ScrollArea>
 
-      {/* Добавление нового этапа */}
       <div className="space-y-2 p-2 border rounded-lg bg-muted/50 shrink-0">
         <Label className="text-sm font-medium">Добавить этап</Label>
         <div className="flex gap-2">
