@@ -51,17 +51,21 @@ export function StageDetailView({
     enabled: !!stageId,
   });
 
+  const { data: allProjectDocuments = [] } = useQuery<any[]>({
+    queryKey: ["/api/projects", projectId, "documents"],
+    enabled: !!projectId,
+  });
+
   const createMessageMutation = useMutation({
     mutationFn: async (message: string) => {
       if (!user?.id) {
         throw new Error("User not authenticated");
       }
-      const response = await apiRequest(
+      await apiRequest(
         "POST",
         `/api/stages/${stageId}/messages`,
         { message, user_id: user.id }
       );
-      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/stages", stageId, "messages"] });
@@ -233,6 +237,26 @@ export function StageDetailView({
           </div>
         </CardContent>
       </Card>
+
+      {projectId && allProjectDocuments.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Все документы проекта</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ScrollArea className="h-[200px]">
+              <div className="space-y-2">
+                {allProjectDocuments.map((doc: any) => (
+                  <div key={doc.id} className="flex items-center gap-2 p-2 border rounded-md text-sm">
+                    <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                    <span className="flex-1 truncate">{doc.name}</span>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
