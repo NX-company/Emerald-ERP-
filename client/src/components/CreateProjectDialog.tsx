@@ -173,10 +173,10 @@ export function CreateProjectDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <>
+        <div className="flex flex-col gap-3 min-h-0">
           {currentTab === "positions" ? (
-            <div className="space-y-4">
-            <div className="flex items-center justify-between gap-2 pb-2 border-b">
+            <>
+            <div className="flex items-center justify-between gap-2 pb-2 border-b shrink-0">
             <div className="flex items-center gap-2">
               <Checkbox
                 id="select-all"
@@ -199,17 +199,17 @@ export function CreateProjectDialog({
               onClick={handleAddPosition}
               data-testid="button-add-position"
             >
-              <Plus className="w-4 h-4 mr-2" />
+              <Plus className="w-4 h-4 mr-1" />
               Добавить
             </Button>
           </div>
 
-          <ScrollArea className="h-[400px] pr-4">
+          <ScrollArea className="h-[280px] pr-3">
             <div className="space-y-2">
               {positions.map((position, index) => (
                 <div
                   key={index}
-                  className="flex items-start gap-3 p-3 rounded-lg border hover-elevate"
+                  className="flex items-start gap-2 p-2 rounded-lg border hover-elevate"
                   data-testid={`position-${index}`}
                 >
                   <Checkbox
@@ -217,6 +217,7 @@ export function CreateProjectDialog({
                     checked={selectedIndices.has(index)}
                     onCheckedChange={() => handleToggle(index)}
                     data-testid={`checkbox-position-${index}`}
+                    className="mt-0.5"
                   />
                   
                   {editingIndex === index ? (
@@ -262,13 +263,13 @@ export function CreateProjectDialog({
                       </div>
                     </div>
                   ) : (
-                    <div className="flex-1 flex items-start justify-between gap-4">
+                    <div className="flex-1 flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-sm" data-testid={`text-position-name-${index}`}>
                           {position.name}
                         </p>
                         {position.article && (
-                          <p className="text-xs text-muted-foreground mt-1" data-testid={`text-position-article-${index}`}>
+                          <p className="text-xs text-muted-foreground" data-testid={`text-position-article-${index}`}>
                             Артикул: {position.article}
                           </p>
                         )}
@@ -324,11 +325,11 @@ export function CreateProjectDialog({
           </ScrollArea>
 
           {selectedIndices.size === 0 && (
-            <p className="text-sm text-destructive" data-testid="text-validation-error">
+            <p className="text-sm text-destructive shrink-0" data-testid="text-validation-error">
               Выберите хотя бы одну позицию для создания проекта
             </p>
           )}
-            </div>
+            </>
           ) : selectedPositionForStages !== null ? (
             <LocalStageEditor
               positionName={positions[selectedPositionForStages]?.name || ""}
@@ -355,7 +356,7 @@ export function CreateProjectDialog({
             />
           ) : null}
 
-          <DialogFooter>
+          <DialogFooter className="shrink-0">
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
@@ -373,7 +374,7 @@ export function CreateProjectDialog({
             {isPending ? "Создание..." : "Создать проект"}
           </Button>
           </DialogFooter>
-        </>
+        </div>
       </DialogContent>
     </Dialog>
   );
