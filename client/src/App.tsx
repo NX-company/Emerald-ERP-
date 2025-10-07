@@ -9,6 +9,7 @@ import { TopBar } from "@/components/TopBar";
 import Dashboard from "@/pages/Dashboard";
 import Sales from "@/pages/Sales";
 import Projects from "@/pages/Projects";
+import ProjectDetailPage from "@/pages/ProjectDetailPage";
 import Production from "@/pages/Production";
 import Warehouse from "@/pages/Warehouse";
 import Finance from "@/pages/Finance";
@@ -25,6 +26,7 @@ function Router() {
     <Switch>
       <Route path="/" component={Dashboard} />
       <Route path="/sales" component={Sales} />
+      <Route path="/projects/:id" component={ProjectDetailPage} />
       <Route path="/projects" component={Projects} />
       <Route path="/production" component={Production} />
       <Route path="/warehouse" component={Warehouse} />
