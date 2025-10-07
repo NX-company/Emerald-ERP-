@@ -138,7 +138,8 @@ export class ProjectsRepository {
     invoiceId: string, 
     deal: any, 
     invoice: any, 
-    selectedPositionIndices?: number[]
+    selectedPositionIndices?: number[],
+    editedPositions?: any[]
   ): Promise<Project> {
     const projectData: InsertProject = {
       name: `Проект №${invoice.name}`,
@@ -153,7 +154,26 @@ export class ProjectsRepository {
 
     const project = await this.createProject(projectData);
 
-    if (invoice.data?.positions && Array.isArray(invoice.data.positions)) {
+    // Если переданы отредактированные позиции, используем их
+    if (editedPositions && editedPositions.length > 0 && selectedPositionIndices && selectedPositionIndices.length > 0) {
+      const positionsToAdd = selectedPositionIndices.map(index => editedPositions[index]).filter(p => p);
+      
+      const itemsData: InsertProjectItem[] = positionsToAdd.map((position: any, index: number) => ({
+        project_id: project.id,
+        name: position.name,
+        article: position.article || undefined,
+        quantity: position.quantity || 1,
+        price: position.price,
+        source_document_id: invoiceId,
+        order: index,
+      }));
+
+      if (itemsData.length > 0) {
+        await db.insert(project_items).values(itemsData);
+      }
+    } 
+    // Иначе используем оригинальные позиции из счета
+    else if (invoice.data?.positions && Array.isArray(invoice.data.positions)) {
       let positionsToAdd = invoice.data.positions;
       
       // Если указаны индексы позиций, фильтруем только выбранные

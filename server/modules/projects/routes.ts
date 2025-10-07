@@ -91,6 +91,7 @@ router.post("/api/projects/from-invoice", async (req, res) => {
       dealId: z.string(),
       invoiceId: z.string(),
       selectedPositions: z.array(z.number()).optional(),
+      editedPositions: z.array(z.any()).optional(),
     });
 
     const validationResult = requestSchema.safeParse(req.body);
@@ -101,7 +102,7 @@ router.post("/api/projects/from-invoice", async (req, res) => {
       return;
     }
 
-    const { dealId, invoiceId, selectedPositions } = validationResult.data;
+    const { dealId, invoiceId, selectedPositions, editedPositions } = validationResult.data;
 
     const deal = await salesRepository.getDealById(dealId);
     if (!deal) {
@@ -131,7 +132,8 @@ router.post("/api/projects/from-invoice", async (req, res) => {
       invoiceId, 
       deal, 
       invoice,
-      selectedPositions
+      selectedPositions,
+      editedPositions
     );
     res.status(201).json(project);
   } catch (error) {
