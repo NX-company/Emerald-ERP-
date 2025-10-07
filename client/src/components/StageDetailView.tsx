@@ -80,12 +80,21 @@ export function StageDetailView({
   const updateStatusMutation = useMutation({
     mutationFn: async (status: string) => {
       await apiRequest("PUT", `/api/projects/stages/${stageId}`, { status });
+      
+      if (user?.id) {
+        const statusText = status === 'pending' ? 'Ожидает' : status === 'in_progress' ? 'В работе' : 'Завершён';
+        await apiRequest("POST", `/api/stages/${stageId}/messages`, {
+          message: `Изменён статус на: ${statusText}`,
+          user_id: user.id,
+        });
+      }
     },
     onSuccess: () => {
       if (projectId) {
         queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "stages"] });
         queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
       }
+      queryClient.invalidateQueries({ queryKey: ["/api/stages", stageId, "messages"] });
       onStatusChange?.();
       toast({ description: "Статус обновлен" });
     },
@@ -105,6 +114,11 @@ export function StageDetailView({
   };
 
   const uploadFiles = async (files: FileList) => {
+    if (!user?.id) {
+      toast({ description: "Требуется авторизация", variant: "destructive" });
+      return;
+    }
+    
     setUploadingFile(true);
     try {
       const uploadPromises = Array.from(files).map(file =>
@@ -113,11 +127,20 @@ export function StageDetailView({
           type: "other",
           file_path: "",
           project_stage_id: stageId,
+          uploaded_by: user.id,
         })
       );
       
       await Promise.all(uploadPromises);
+      
+      await apiRequest("POST", `/api/stages/${stageId}/messages`, {
+        message: `Загружено файлов: ${Array.from(files).map(f => f.name).join(', ')}`,
+        user_id: user.id,
+      });
+      
       queryClient.invalidateQueries({ queryKey: ["/api/stages", stageId, "documents"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stages", stageId, "messages"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "documents"] });
       toast({ description: `Загружено файлов: ${files.length}` });
     } catch (error) {
       toast({ description: "Ошибка загрузки файлов", variant: "destructive" });
@@ -247,9 +270,14 @@ export function StageDetailView({
             <ScrollArea className="h-[200px]">
               <div className="space-y-2">
                 {allProjectDocuments.map((doc: any) => (
-                  <div key={doc.id} className="flex items-center gap-2 p-2 border rounded-md text-sm">
-                    <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                    <span className="flex-1 truncate">{doc.name}</span>
+                  <div key={doc.id} className="flex items-start gap-2 p-2 border rounded-md">
+                    <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{doc.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {doc.stage_name} • {doc.user_name || 'Неизвестно'}
+                      </p>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -272,7 +300,7 @@ export function StageDetailView({
                   <div key={msg.id} className="border-l-2 border-primary pl-3 py-1">
                     <p className="text-sm">{msg.message}</p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {new Date(msg.created_at).toLocaleString('ru-RU')}
+                      {msg.user_name} • {new Date(msg.created_at).toLocaleString('ru-RU')}
                     </p>
                   </div>
                 ))

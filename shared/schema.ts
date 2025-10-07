@@ -309,6 +309,7 @@ export const documents = pgTable("documents", {
   template_stage_id: varchar("template_stage_id").references(() => template_stages.id, { onDelete: "cascade" }),
   file_path: text("file_path").notNull(),
   size: integer("size"),
+  uploaded_by: varchar("uploaded_by").references(() => users.id),
   created_at: timestamp("created_at").defaultNow().notNull(),
   updated_at: timestamp("updated_at").defaultNow().notNull(),
 });

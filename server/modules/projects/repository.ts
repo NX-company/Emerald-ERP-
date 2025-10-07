@@ -14,7 +14,7 @@ import type {
 import { 
   projects, project_stages, project_items,
   stage_dependencies, process_templates, template_stages,
-  template_dependencies, stage_messages, documents
+  template_dependencies, stage_messages, documents, users
 } from "@shared/schema";
 
 export class ProjectsRepository {
@@ -503,9 +503,17 @@ export class ProjectsRepository {
   }
 
   // Stage Messages methods
-  async getStageMessages(stageId: string): Promise<StageMessage[]> {
-    return await db.select()
+  async getStageMessages(stageId: string) {
+    return await db.select({
+      id: stage_messages.id,
+      stage_id: stage_messages.stage_id,
+      user_id: stage_messages.user_id,
+      message: stage_messages.message,
+      created_at: stage_messages.created_at,
+      user_name: users.username,
+    })
       .from(stage_messages)
+      .leftJoin(users, eq(stage_messages.user_id, users.id))
       .where(eq(stage_messages.stage_id, stageId))
       .orderBy(asc(stage_messages.created_at));
   }
@@ -523,21 +531,30 @@ export class ProjectsRepository {
       .orderBy(asc(documents.created_at));
   }
 
-  async getProjectDocuments(projectId: string): Promise<Document[]> {
+  async getProjectDocuments(projectId: string) {
     const stages = await this.getProjectStages(projectId);
     const stageIds = stages.map(s => s.id);
     
     if (stageIds.length === 0) return [];
     
-    const allDocs = await db.select()
-      .from(documents)
-      .where(eq(documents.project_stage_id, stageIds[0]))
-      .orderBy(asc(documents.created_at));
-    
-    for (let i = 1; i < stageIds.length; i++) {
-      const docs = await db.select()
+    const allDocs = [];
+    for (const stageId of stageIds) {
+      const docs = await db.select({
+        id: documents.id,
+        name: documents.name,
+        type: documents.type,
+        file_path: documents.file_path,
+        size: documents.size,
+        project_stage_id: documents.project_stage_id,
+        uploaded_by: documents.uploaded_by,
+        created_at: documents.created_at,
+        stage_name: project_stages.name,
+        user_name: users.username,
+      })
         .from(documents)
-        .where(eq(documents.project_stage_id, stageIds[i]))
+        .leftJoin(project_stages, eq(documents.project_stage_id, project_stages.id))
+        .leftJoin(users, eq(documents.uploaded_by, users.id))
+        .where(eq(documents.project_stage_id, stageId))
         .orderBy(asc(documents.created_at));
       allDocs.push(...docs);
     }
