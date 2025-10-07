@@ -33,6 +33,7 @@ interface DocumentFormDialogProps {
   onOpenChange: (open: boolean) => void;
   dealId: string;
   documentType: 'quote' | 'invoice' | 'contract';
+  documentId?: string; // For editing existing document
   onSuccess?: () => void;
 }
 
@@ -47,13 +48,24 @@ export function DocumentFormDialog({
   onOpenChange,
   dealId,
   documentType,
+  documentId,
   onSuccess
 }: DocumentFormDialogProps) {
   const { toast } = useToast();
+  const isEditing = !!documentId;
 
   const { data: existingDocuments = [] } = useQuery<DealDocument[]>({
     queryKey: ['/api/deals', dealId, 'documents'],
     enabled: open && documentType === 'quote',
+  });
+
+  const { data: editingDocument } = useQuery<DealDocument | undefined>({
+    queryKey: ['/api/deals', dealId, 'documents', documentId],
+    queryFn: async () => {
+      const docs = await apiRequest('GET', `/api/deals/${dealId}/documents`) as unknown as DealDocument[];
+      return docs.find((doc: DealDocument) => doc.id === documentId);
+    },
+    enabled: open && isEditing,
   });
 
   const form = useForm<DocumentFormData>({
@@ -70,6 +82,29 @@ export function DocumentFormDialog({
     name: "positions",
   });
 
+  // Load existing document data when editing
+  useEffect(() => {
+    if (editingDocument && open) {
+      const docData = editingDocument.data as any;
+      const positions = docData?.positions || [{ name: "", price: 0, quantity: 1 }];
+      form.reset({
+        name: editingDocument.name,
+        positions: positions.map((pos: any) => ({
+          name: pos.name,
+          price: pos.price,
+          quantity: pos.quantity,
+        })),
+        is_signed: editingDocument.is_signed || false,
+      });
+    } else if (!isEditing && open) {
+      form.reset({
+        name: "",
+        positions: [{ name: "", price: 0, quantity: 1 }],
+        is_signed: false,
+      });
+    }
+  }, [editingDocument, open, isEditing, form]);
+
   const positions = form.watch("positions");
   
   const calculateTotal = (price: number, quantity: number) => {
@@ -80,73 +115,73 @@ export function DocumentFormDialog({
     return sum + calculateTotal(pos.price || 0, pos.quantity || 1);
   }, 0);
 
-  const createDocument = useMutation({
+  const saveDocument = useMutation({
     mutationFn: async (data: DocumentFormData) => {
-      let version = 1;
-      if (documentType === 'quote') {
-        const quoteDocuments = existingDocuments.filter(
-          (doc) => doc.document_type === 'quote'
-        );
-        const maxVersion = quoteDocuments.reduce(
-          (max, doc) => Math.max(max, doc.version || 0),
-          0
-        );
-        version = maxVersion + 1;
-      }
-
       const positionsWithTotal = data.positions.map(pos => ({
         ...pos,
         total: calculateTotal(pos.price, pos.quantity)
       }));
 
-      return await apiRequest('POST', `/api/deals/${dealId}/documents`, {
-        document_type: documentType,
-        name: data.name,
-        version: version,
-        file_url: `placeholder-${Date.now()}`,
-        data: { positions: positionsWithTotal },
-        total_amount: grandTotal.toString(),
-        is_signed: documentType === 'contract' ? data.is_signed : false,
-      });
+      if (isEditing && documentId) {
+        // Update existing document
+        return await apiRequest('PUT', `/api/deals/${dealId}/documents/${documentId}`, {
+          name: data.name,
+          data: { positions: positionsWithTotal },
+          total_amount: grandTotal.toString(),
+          is_signed: documentType === 'contract' ? data.is_signed : undefined,
+        });
+      } else {
+        // Create new document
+        let version = 1;
+        if (documentType === 'quote') {
+          const quoteDocuments = existingDocuments.filter(
+            (doc) => doc.document_type === 'quote'
+          );
+          const maxVersion = quoteDocuments.reduce(
+            (max, doc) => Math.max(max, doc.version || 0),
+            0
+          );
+          version = maxVersion + 1;
+        }
+
+        return await apiRequest('POST', `/api/deals/${dealId}/documents`, {
+          document_type: documentType,
+          name: data.name,
+          version: version,
+          file_url: `placeholder-${Date.now()}`,
+          data: { positions: positionsWithTotal },
+          total_amount: grandTotal.toString(),
+          is_signed: documentType === 'contract' ? data.is_signed : false,
+        });
+      }
     },
     onSuccess: () => {
       toast({
         title: "Успешно",
-        description: `${documentTypeLabels[documentType]} создан`,
+        description: isEditing ? `${documentTypeLabels[documentType]} обновлён` : `${documentTypeLabels[documentType]} создан`,
       });
       queryClient.invalidateQueries({ queryKey: ['/api/deals', dealId, 'documents'] });
       onSuccess?.();
       onOpenChange(false);
-      form.reset();
     },
     onError: (error: any) => {
       toast({
         title: "Ошибка",
-        description: error.message || "Не удалось создать документ",
+        description: error.message || `Не удалось ${isEditing ? 'обновить' : 'создать'} документ`,
         variant: "destructive",
       });
     },
   });
 
   const handleSubmit = (data: DocumentFormData) => {
-    createDocument.mutate(data);
+    saveDocument.mutate(data);
   };
-
-  useEffect(() => {
-    if (!open) {
-      form.reset({
-        name: "",
-        positions: [{ name: "", price: 0, quantity: 1 }],
-        is_signed: false,
-      });
-    }
-  }, [open, form]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto" data-testid={`dialog-create-${documentType}`}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto" data-testid={`dialog-${isEditing ? 'edit' : 'create'}-${documentType}`}>
         <DialogHeader>
-          <DialogTitle>Создать {documentTypeLabels[documentType]}</DialogTitle>
+          <DialogTitle>{isEditing ? 'Редактировать' : 'Создать'} {documentTypeLabels[documentType]}</DialogTitle>
         </DialogHeader>
 
         <Form {...form}>
@@ -320,10 +355,10 @@ export function DocumentFormDialog({
               </Button>
               <Button
                 type="submit"
-                disabled={createDocument.isPending}
+                disabled={saveDocument.isPending}
                 data-testid="button-submit"
               >
-                {createDocument.isPending ? "Создание..." : "Создать"}
+                {saveDocument.isPending ? (isEditing ? "Сохранение..." : "Создание...") : (isEditing ? "Сохранить" : "Создать")}
               </Button>
             </div>
           </form>

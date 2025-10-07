@@ -58,6 +58,7 @@ export function DealCardModal({ dealId, open, onOpenChange }: DealCardModalProps
   const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
   const [contractDialogOpen, setContractDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [editingDocumentId, setEditingDocumentId] = useState<string | undefined>();
   
   const { toast } = useToast();
 
@@ -521,7 +522,15 @@ export function DealCardModal({ dealId, open, onOpenChange }: DealCardModalProps
                       <div>
                         <p className="font-medium">Договоры ({contracts.length})</p>
                         {contracts.map(c => (
-                          <p key={c.id} className="text-muted-foreground ml-4">
+                          <p 
+                            key={c.id} 
+                            className="text-muted-foreground ml-4 cursor-pointer hover:text-primary"
+                            onClick={() => {
+                              setEditingDocumentId(c.id);
+                              setContractDialogOpen(true);
+                            }}
+                            data-testid={`contract-item-${c.id}`}
+                          >
                             • {c.name} {c.is_signed && '✓'}
                           </p>
                         ))}
@@ -593,11 +602,16 @@ export function DealCardModal({ dealId, open, onOpenChange }: DealCardModalProps
 
       <DocumentFormDialog
         open={contractDialogOpen}
-        onOpenChange={setContractDialogOpen}
+        onOpenChange={(open) => {
+          setContractDialogOpen(open);
+          if (!open) setEditingDocumentId(undefined);
+        }}
         dealId={dealId}
         documentType="contract"
+        documentId={editingDocumentId}
         onSuccess={() => {
           queryClient.invalidateQueries({ queryKey: ['/api/deals', dealId, 'documents'] });
+          setEditingDocumentId(undefined);
         }}
       />
     </Dialog>
