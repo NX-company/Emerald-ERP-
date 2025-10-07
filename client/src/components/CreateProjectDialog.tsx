@@ -74,6 +74,12 @@ export function CreateProjectDialog({
     enabled: open,
   });
 
+  // Load users for executor selection
+  const { data: users = [] } = useQuery<any[]>({
+    queryKey: ["/api/users"],
+    enabled: open,
+  });
+
   useEffect(() => {
     if (open && invoicePositions.length > 0) {
       setPositions([...invoicePositions]);
@@ -190,6 +196,10 @@ export function CreateProjectDialog({
         id: stageIdMap[stage.id],
         name: stage.name,
         order_index: stage.order,
+        duration_days: stage.duration_days,
+        assignee_role: stage.assignee_role,
+        cost: stage.cost ? parseFloat(stage.cost) : undefined,
+        description: stage.description,
       }));
 
       // Map dependencies with validation - skip invalid dependencies
@@ -452,6 +462,8 @@ export function CreateProjectDialog({
                 positionName={positions[selectedPositionForStages]?.name || ""}
                 stages={positionStagesData[selectedPositionForStages]?.stages || []}
                 dependencies={positionStagesData[selectedPositionForStages]?.dependencies || []}
+                mode="project"
+                users={users}
                 onStagesChange={(stages) => {
                   setPositionStagesData(prev => ({
                     ...prev,

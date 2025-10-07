@@ -148,6 +148,10 @@ export default function ProcessTemplates() {
         id: s.id,
         name: s.name,
         order_index: s.order,
+        duration_days: s.duration_days,
+        assignee_role: s.assignee_role,
+        cost: s.cost ? parseFloat(s.cost) : undefined,
+        description: s.description,
       }));
 
       const localDeps: LocalStageDependency[] = data.dependencies.map((d: any) => ({
@@ -184,6 +188,10 @@ export default function ProcessTemplates() {
           {
             name: stage.name,
             order: stage.order_index,
+            duration_days: stage.duration_days,
+            assignee_role: stage.assignee_role,
+            cost: stage.cost,
+            description: stage.description,
           }
         );
         const data = await response.json();

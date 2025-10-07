@@ -92,6 +92,22 @@ export class ProjectsRepository {
       .orderBy(asc(project_stages.order));
   }
 
+  async getStagesByAssignee(assigneeId: string): Promise<Array<ProjectStage & { project: Project }>> {
+    const stages = await db.select()
+      .from(project_stages)
+      .where(eq(project_stages.assignee_id, assigneeId))
+      .orderBy(asc(project_stages.created_at));
+
+    const stagesWithProjects = await Promise.all(
+      stages.map(async (stage) => {
+        const project = await this.getProjectById(stage.project_id);
+        return { ...stage, project: project! };
+      })
+    );
+
+    return stagesWithProjects.filter(s => s.project);
+  }
+
   async createProjectStage(data: InsertProjectStage): Promise<ProjectStage> {
     const result = await db.insert(project_stages).values(data).returning();
     await this.updateProjectProgress(data.project_id);

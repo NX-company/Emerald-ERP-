@@ -199,6 +199,18 @@ router.delete("/api/projects/:id", async (req, res) => {
   }
 });
 
+// GET /api/my-tasks/:userId - Get stages assigned to user
+router.get("/api/my-tasks/:userId", async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const stages = await projectsRepository.getStagesByAssignee(userId);
+    res.json(stages);
+  } catch (error) {
+    console.error("Error fetching user tasks:", error);
+    res.status(500).json({ error: "Failed to fetch user tasks" });
+  }
+});
+
 // GET /api/projects/:id/stages - Get all stages for a project
 router.get("/api/projects/:id/stages", async (req, res) => {
   try {

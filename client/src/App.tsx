@@ -16,6 +16,7 @@ import Finance from "@/pages/Finance";
 import Installation from "@/pages/Installation";
 import Mail from "@/pages/Mail";
 import Tasks from "@/pages/Tasks";
+import MyTasks from "@/pages/MyTasks";
 import Documents from "@/pages/Documents";
 import AIAgents from "@/pages/AIAgents";
 import Settings from "@/pages/Settings";
@@ -35,6 +36,7 @@ function Router() {
       <Route path="/installation" component={Installation} />
       <Route path="/mail" component={Mail} />
       <Route path="/tasks" component={Tasks} />
+      <Route path="/my-tasks" component={MyTasks} />
       <Route path="/documents" component={Documents} />
       <Route path="/ai-agents" component={AIAgents} />
       <Route path="/process-templates" component={ProcessTemplates} />

@@ -6,11 +6,17 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
 
 export interface LocalStage {
   id: string;
   name: string;
   order_index: number;
+  duration_days?: number;
+  assignee_role?: string;
+  assignee_id?: string;
+  cost?: number;
+  description?: string;
 }
 
 export interface LocalStageDependency {
@@ -24,6 +30,8 @@ interface LocalStageEditorProps {
   dependencies?: LocalStageDependency[];
   onStagesChange: (stages: LocalStage[]) => void;
   onDependenciesChange?: (dependencies: LocalStageDependency[]) => void;
+  mode?: 'template' | 'project';
+  users?: Array<{ id: string; full_name?: string; username: string }>;
 }
 
 export function LocalStageEditor({ 
@@ -31,9 +39,12 @@ export function LocalStageEditor({
   stages, 
   dependencies = [],
   onStagesChange,
-  onDependenciesChange
+  onDependenciesChange,
+  mode = 'template',
+  users = []
 }: LocalStageEditorProps) {
   const [newStageName, setNewStageName] = useState("");
+  const [expandedStage, setExpandedStage] = useState<string | null>(null);
 
   const handleAddStage = () => {
     if (!newStageName.trim()) return;
@@ -175,12 +186,89 @@ export function LocalStageEditor({
                       type="button"
                       size="icon"
                       variant="ghost"
+                      onClick={() => setExpandedStage(expandedStage === stage.id ? null : stage.id)}
+                      data-testid={`button-expand-${index}`}
+                    >
+                      <ChevronDown className={`w-4 h-4 transition-transform ${expandedStage === stage.id ? 'rotate-180' : ''}`} />
+                    </Button>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
                       onClick={() => handleDeleteStage(stage.id)}
                       data-testid={`button-delete-stage-${index}`}
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>
                   </div>
+
+                  {expandedStage === stage.id && (
+                    <div className="grid grid-cols-2 gap-2 pl-12 pt-2">
+                      <div>
+                        <Label className="text-xs">Срок (дни)</Label>
+                        <Input
+                          type="number"
+                          value={stage.duration_days || ''}
+                          onChange={(e) => handleUpdateStage(stage.id, 'duration_days', parseInt(e.target.value) || 0)}
+                          placeholder="7"
+                          className="h-8"
+                          data-testid={`input-duration-${index}`}
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Стоимость</Label>
+                        <Input
+                          type="number"
+                          value={stage.cost || ''}
+                          onChange={(e) => handleUpdateStage(stage.id, 'cost', parseFloat(e.target.value) || 0)}
+                          placeholder="0"
+                          className="h-8"
+                          data-testid={`input-cost-${index}`}
+                        />
+                      </div>
+                      {mode === 'template' ? (
+                        <div className="col-span-2">
+                          <Label className="text-xs">Роль исполнителя</Label>
+                          <Input
+                            value={stage.assignee_role || ''}
+                            onChange={(e) => handleUpdateStage(stage.id, 'assignee_role', e.target.value)}
+                            placeholder="Например: Столяр"
+                            className="h-8"
+                            data-testid={`input-assignee-role-${index}`}
+                          />
+                        </div>
+                      ) : (
+                        <div className="col-span-2">
+                          <Label className="text-xs">Исполнитель</Label>
+                          <Select
+                            value={stage.assignee_id || ''}
+                            onValueChange={(value) => handleUpdateStage(stage.id, 'assignee_id', value)}
+                          >
+                            <SelectTrigger className="h-8" data-testid={`select-assignee-${index}`}>
+                              <SelectValue placeholder="Выбрать исполнителя" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {users.map(u => (
+                                <SelectItem key={u.id} value={u.id}>
+                                  {u.full_name || u.username}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                      <div className="col-span-2">
+                        <Label className="text-xs">Описание</Label>
+                        <Textarea
+                          value={stage.description || ''}
+                          onChange={(e) => handleUpdateStage(stage.id, 'description', e.target.value)}
+                          placeholder="Детали выполнения этапа"
+                          className="h-16 text-xs"
+                          data-testid={`textarea-description-${index}`}
+                        />
+                      </div>
+                    </div>
+                  )}
 
                   {/* Зависимости */}
                   {onDependenciesChange && (
