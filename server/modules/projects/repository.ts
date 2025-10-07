@@ -1,7 +1,20 @@
 import { db } from "../../db";
 import { eq, asc } from "drizzle-orm";
-import type { Project, InsertProject, ProjectStage, InsertProjectStage, ProjectItem, InsertProjectItem } from "@shared/schema";
-import { projects, project_stages, project_items } from "@shared/schema";
+import type { 
+  Project, InsertProject, 
+  ProjectStage, InsertProjectStage, 
+  ProjectItem, InsertProjectItem,
+  StageDependency, InsertStageDependency,
+  ProcessTemplate, InsertProcessTemplate,
+  TemplateStage, InsertTemplateStage,
+  TemplateDependency, InsertTemplateDependency,
+  StageMessage, InsertStageMessage
+} from "@shared/schema";
+import { 
+  projects, project_stages, project_items,
+  stage_dependencies, process_templates, template_stages,
+  template_dependencies, stage_messages
+} from "@shared/schema";
 
 export class ProjectsRepository {
   // Project methods
@@ -148,6 +161,225 @@ export class ProjectsRepository {
     }
 
     return project;
+  }
+
+  // Project Items methods
+  async getProjectItems(projectId: string): Promise<ProjectItem[]> {
+    return await db.select()
+      .from(project_items)
+      .where(eq(project_items.project_id, projectId))
+      .orderBy(asc(project_items.order));
+  }
+
+  async getProjectItemById(itemId: string): Promise<ProjectItem | undefined> {
+    const result = await db.select().from(project_items).where(eq(project_items.id, itemId));
+    return result[0];
+  }
+
+  async createProjectItem(data: InsertProjectItem): Promise<ProjectItem> {
+    const result = await db.insert(project_items).values(data).returning();
+    return result[0];
+  }
+
+  async updateProjectItem(itemId: string, data: Partial<InsertProjectItem>): Promise<ProjectItem | undefined> {
+    const result = await db.update(project_items)
+      .set({ ...data, updated_at: new Date() })
+      .where(eq(project_items.id, itemId))
+      .returning();
+    return result[0];
+  }
+
+  async deleteProjectItem(itemId: string): Promise<boolean> {
+    await db.delete(project_stages).where(eq(project_stages.item_id, itemId));
+    const result = await db.delete(project_items).where(eq(project_items.id, itemId)).returning();
+    return result.length > 0;
+  }
+
+  async getItemStages(itemId: string): Promise<ProjectStage[]> {
+    return await db.select()
+      .from(project_stages)
+      .where(eq(project_stages.item_id, itemId))
+      .orderBy(asc(project_stages.order));
+  }
+
+  // Stage Dependencies methods
+  async getProjectDependencies(projectId: string): Promise<StageDependency[]> {
+    const stages = await this.getProjectStages(projectId);
+    const stageIds = stages.map(s => s.id);
+    
+    if (stageIds.length === 0) {
+      return [];
+    }
+
+    const dependencies: StageDependency[] = [];
+    for (const stageId of stageIds) {
+      const deps = await db.select()
+        .from(stage_dependencies)
+        .where(eq(stage_dependencies.stage_id, stageId));
+      dependencies.push(...deps);
+    }
+    
+    return dependencies;
+  }
+
+  async createStageDependency(data: InsertStageDependency): Promise<StageDependency> {
+    const result = await db.insert(stage_dependencies).values(data).returning();
+    return result[0];
+  }
+
+  async deleteStageDependency(dependencyId: string): Promise<boolean> {
+    const result = await db.delete(stage_dependencies)
+      .where(eq(stage_dependencies.id, dependencyId))
+      .returning();
+    return result.length > 0;
+  }
+
+  // Process Templates methods
+  async getAllTemplates(): Promise<ProcessTemplate[]> {
+    return await db.select().from(process_templates).orderBy(asc(process_templates.created_at));
+  }
+
+  async getTemplateById(templateId: string): Promise<ProcessTemplate | undefined> {
+    const result = await db.select().from(process_templates).where(eq(process_templates.id, templateId));
+    return result[0];
+  }
+
+  async createTemplate(data: InsertProcessTemplate): Promise<ProcessTemplate> {
+    const result = await db.insert(process_templates).values(data).returning();
+    return result[0];
+  }
+
+  async updateTemplate(templateId: string, data: Partial<InsertProcessTemplate>): Promise<ProcessTemplate | undefined> {
+    const result = await db.update(process_templates)
+      .set({ ...data, updated_at: new Date() })
+      .where(eq(process_templates.id, templateId))
+      .returning();
+    return result[0];
+  }
+
+  async deleteTemplate(templateId: string): Promise<boolean> {
+    const result = await db.delete(process_templates)
+      .where(eq(process_templates.id, templateId))
+      .returning();
+    return result.length > 0;
+  }
+
+  // Template Stages methods
+  async getTemplateStages(templateId: string): Promise<TemplateStage[]> {
+    return await db.select()
+      .from(template_stages)
+      .where(eq(template_stages.template_id, templateId))
+      .orderBy(asc(template_stages.order));
+  }
+
+  async createTemplateStage(data: InsertTemplateStage): Promise<TemplateStage> {
+    const result = await db.insert(template_stages).values(data).returning();
+    return result[0];
+  }
+
+  async updateTemplateStage(stageId: string, data: Partial<InsertTemplateStage>): Promise<TemplateStage | undefined> {
+    const result = await db.update(template_stages)
+      .set({ ...data, updated_at: new Date() })
+      .where(eq(template_stages.id, stageId))
+      .returning();
+    return result[0];
+  }
+
+  async deleteTemplateStage(stageId: string): Promise<boolean> {
+    const result = await db.delete(template_stages)
+      .where(eq(template_stages.id, stageId))
+      .returning();
+    return result.length > 0;
+  }
+
+  // Template Dependencies methods
+  async getTemplateDependencies(templateId: string): Promise<TemplateDependency[]> {
+    const stages = await this.getTemplateStages(templateId);
+    const stageIds = stages.map(s => s.id);
+    
+    if (stageIds.length === 0) {
+      return [];
+    }
+
+    const dependencies: TemplateDependency[] = [];
+    for (const stageId of stageIds) {
+      const deps = await db.select()
+        .from(template_dependencies)
+        .where(eq(template_dependencies.template_stage_id, stageId));
+      dependencies.push(...deps);
+    }
+    
+    return dependencies;
+  }
+
+  async createTemplateDependency(data: InsertTemplateDependency): Promise<TemplateDependency> {
+    const result = await db.insert(template_dependencies).values(data).returning();
+    return result[0];
+  }
+
+  async deleteTemplateDependency(dependencyId: string): Promise<boolean> {
+    const result = await db.delete(template_dependencies)
+      .where(eq(template_dependencies.id, dependencyId))
+      .returning();
+    return result.length > 0;
+  }
+
+  // Apply Template to Item
+  async applyTemplateToItem(templateId: string, itemId: string): Promise<{ stages: ProjectStage[], dependencies: StageDependency[] }> {
+    const item = await this.getProjectItemById(itemId);
+    if (!item) {
+      throw new Error("Project item not found");
+    }
+
+    const templateStages = await this.getTemplateStages(templateId);
+    const templateDeps = await this.getTemplateDependencies(templateId);
+
+    const stageIdMap = new Map<string, string>();
+    const createdStages: ProjectStage[] = [];
+
+    for (const templateStage of templateStages) {
+      const newStage = await this.createProjectStage({
+        project_id: item.project_id,
+        item_id: itemId,
+        name: templateStage.name,
+        description: templateStage.description || undefined,
+        cost: templateStage.cost || undefined,
+        status: "pending",
+        order: templateStage.order,
+      });
+      stageIdMap.set(templateStage.id, newStage.id);
+      createdStages.push(newStage);
+    }
+
+    const createdDependencies: StageDependency[] = [];
+
+    for (const templateDep of templateDeps) {
+      const newStageId = stageIdMap.get(templateDep.template_stage_id);
+      const dependsOnStageId = stageIdMap.get(templateDep.depends_on_template_stage_id);
+
+      if (newStageId && dependsOnStageId) {
+        const newDep = await this.createStageDependency({
+          stage_id: newStageId,
+          depends_on_stage_id: dependsOnStageId,
+        });
+        createdDependencies.push(newDep);
+      }
+    }
+
+    return { stages: createdStages, dependencies: createdDependencies };
+  }
+
+  // Stage Messages methods
+  async getStageMessages(stageId: string): Promise<StageMessage[]> {
+    return await db.select()
+      .from(stage_messages)
+      .where(eq(stage_messages.stage_id, stageId))
+      .orderBy(asc(stage_messages.created_at));
+  }
+
+  async createStageMessage(data: InsertStageMessage): Promise<StageMessage> {
+    const result = await db.insert(stage_messages).values(data).returning();
+    return result[0];
   }
 }
 

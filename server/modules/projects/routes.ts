@@ -1,6 +1,10 @@
 import { Router } from "express";
 import { projectsRepository } from "./repository";
-import { insertProjectSchema, insertProjectStageSchema } from "@shared/schema";
+import { 
+  insertProjectSchema, insertProjectStageSchema, insertProjectItemSchema,
+  insertStageDependencySchema, insertProcessTemplateSchema, insertTemplateStageSchema,
+  insertTemplateDependencySchema, insertStageMessageSchema
+} from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
 import { salesRepository } from "../sales/repository";
 import { z } from "zod";
@@ -265,5 +269,464 @@ router.delete("/api/projects/stages/:stageId", async (req, res) => {
   } catch (error) {
     console.error("Error deleting project stage:", error);
     res.status(500).json({ error: "Failed to delete project stage" });
+  }
+});
+
+// ===== Project Items Routes =====
+
+// GET /api/projects/:projectId/items - Get all items for a project
+router.get("/api/projects/:projectId/items", async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const items = await projectsRepository.getProjectItems(projectId);
+    res.json(items);
+  } catch (error) {
+    console.error("Error fetching project items:", error);
+    res.status(500).json({ error: "Failed to fetch project items" });
+  }
+});
+
+// POST /api/projects/:projectId/items - Create new item
+router.post("/api/projects/:projectId/items", async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    
+    const validationResult = insertProjectItemSchema.safeParse({
+      ...req.body,
+      project_id: projectId
+    });
+    
+    if (!validationResult.success) {
+      const errorMessage = fromZodError(validationResult.error).toString();
+      res.status(400).json({ error: errorMessage });
+      return;
+    }
+    
+    const newItem = await projectsRepository.createProjectItem(validationResult.data);
+    res.status(201).json(newItem);
+  } catch (error) {
+    console.error("Error creating project item:", error);
+    res.status(500).json({ error: "Failed to create project item" });
+  }
+});
+
+// PUT /api/projects/:projectId/items/:itemId - Update item
+router.put("/api/projects/:projectId/items/:itemId", async (req, res) => {
+  try {
+    const { itemId } = req.params;
+    
+    const validationResult = insertProjectItemSchema.partial().safeParse(req.body);
+    
+    if (!validationResult.success) {
+      const errorMessage = fromZodError(validationResult.error).toString();
+      res.status(400).json({ error: errorMessage });
+      return;
+    }
+    
+    const updatedItem = await projectsRepository.updateProjectItem(itemId, validationResult.data);
+    
+    if (!updatedItem) {
+      res.status(404).json({ error: "Project item not found" });
+      return;
+    }
+    
+    res.json(updatedItem);
+  } catch (error) {
+    console.error("Error updating project item:", error);
+    res.status(500).json({ error: "Failed to update project item" });
+  }
+});
+
+// DELETE /api/projects/:projectId/items/:itemId - Delete item
+router.delete("/api/projects/:projectId/items/:itemId", async (req, res) => {
+  try {
+    const { itemId } = req.params;
+    const deleted = await projectsRepository.deleteProjectItem(itemId);
+    
+    if (!deleted) {
+      res.status(404).json({ error: "Project item not found" });
+      return;
+    }
+    
+    res.status(204).send();
+  } catch (error) {
+    console.error("Error deleting project item:", error);
+    res.status(500).json({ error: "Failed to delete project item" });
+  }
+});
+
+// POST /api/projects/:projectId/items/:itemId/stages - Create stage for specific item
+router.post("/api/projects/:projectId/items/:itemId/stages", async (req, res) => {
+  try {
+    const { projectId, itemId } = req.params;
+    
+    const validationResult = insertProjectStageSchema.safeParse({
+      ...req.body,
+      project_id: projectId,
+      item_id: itemId
+    });
+    
+    if (!validationResult.success) {
+      const errorMessage = fromZodError(validationResult.error).toString();
+      res.status(400).json({ error: errorMessage });
+      return;
+    }
+    
+    const newStage = await projectsRepository.createProjectStage(validationResult.data);
+    res.status(201).json(newStage);
+  } catch (error) {
+    console.error("Error creating stage for item:", error);
+    res.status(500).json({ error: "Failed to create stage for item" });
+  }
+});
+
+// GET /api/projects/:projectId/items/:itemId/stages - Get stages for specific item
+router.get("/api/projects/:projectId/items/:itemId/stages", async (req, res) => {
+  try {
+    const { itemId } = req.params;
+    const stages = await projectsRepository.getItemStages(itemId);
+    res.json(stages);
+  } catch (error) {
+    console.error("Error fetching item stages:", error);
+    res.status(500).json({ error: "Failed to fetch item stages" });
+  }
+});
+
+// ===== Stage Dependencies Routes =====
+
+// GET /api/projects/:projectId/dependencies - Get all dependencies for a project
+router.get("/api/projects/:projectId/dependencies", async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const dependencies = await projectsRepository.getProjectDependencies(projectId);
+    res.json(dependencies);
+  } catch (error) {
+    console.error("Error fetching project dependencies:", error);
+    res.status(500).json({ error: "Failed to fetch project dependencies" });
+  }
+});
+
+// POST /api/stages/:stageId/dependencies - Create dependency
+router.post("/api/stages/:stageId/dependencies", async (req, res) => {
+  try {
+    const { stageId } = req.params;
+    
+    const validationResult = insertStageDependencySchema.safeParse({
+      stage_id: stageId,
+      depends_on_stage_id: req.body.depends_on_stage_id
+    });
+    
+    if (!validationResult.success) {
+      const errorMessage = fromZodError(validationResult.error).toString();
+      res.status(400).json({ error: errorMessage });
+      return;
+    }
+    
+    const newDependency = await projectsRepository.createStageDependency(validationResult.data);
+    res.status(201).json(newDependency);
+  } catch (error) {
+    console.error("Error creating stage dependency:", error);
+    res.status(500).json({ error: "Failed to create stage dependency" });
+  }
+});
+
+// DELETE /api/stages/dependencies/:dependencyId - Delete dependency
+router.delete("/api/stages/dependencies/:dependencyId", async (req, res) => {
+  try {
+    const { dependencyId } = req.params;
+    const deleted = await projectsRepository.deleteStageDependency(dependencyId);
+    
+    if (!deleted) {
+      res.status(404).json({ error: "Stage dependency not found" });
+      return;
+    }
+    
+    res.status(204).send();
+  } catch (error) {
+    console.error("Error deleting stage dependency:", error);
+    res.status(500).json({ error: "Failed to delete stage dependency" });
+  }
+});
+
+// ===== Process Templates Routes =====
+
+// GET /api/process-templates - Get all templates
+router.get("/api/process-templates", async (req, res) => {
+  try {
+    const templates = await projectsRepository.getAllTemplates();
+    res.json(templates);
+  } catch (error) {
+    console.error("Error fetching process templates:", error);
+    res.status(500).json({ error: "Failed to fetch process templates" });
+  }
+});
+
+// POST /api/process-templates - Create template
+router.post("/api/process-templates", async (req, res) => {
+  try {
+    const validationResult = insertProcessTemplateSchema.safeParse(req.body);
+    
+    if (!validationResult.success) {
+      const errorMessage = fromZodError(validationResult.error).toString();
+      res.status(400).json({ error: errorMessage });
+      return;
+    }
+    
+    const newTemplate = await projectsRepository.createTemplate(validationResult.data);
+    res.status(201).json(newTemplate);
+  } catch (error) {
+    console.error("Error creating process template:", error);
+    res.status(500).json({ error: "Failed to create process template" });
+  }
+});
+
+// GET /api/process-templates/:templateId - Get template with stages and dependencies
+router.get("/api/process-templates/:templateId", async (req, res) => {
+  try {
+    const { templateId } = req.params;
+    
+    const template = await projectsRepository.getTemplateById(templateId);
+    if (!template) {
+      res.status(404).json({ error: "Process template not found" });
+      return;
+    }
+    
+    const stages = await projectsRepository.getTemplateStages(templateId);
+    const dependencies = await projectsRepository.getTemplateDependencies(templateId);
+    
+    res.json({ ...template, stages, dependencies });
+  } catch (error) {
+    console.error("Error fetching process template:", error);
+    res.status(500).json({ error: "Failed to fetch process template" });
+  }
+});
+
+// PUT /api/process-templates/:templateId - Update template
+router.put("/api/process-templates/:templateId", async (req, res) => {
+  try {
+    const { templateId } = req.params;
+    
+    const validationResult = insertProcessTemplateSchema.partial().safeParse(req.body);
+    
+    if (!validationResult.success) {
+      const errorMessage = fromZodError(validationResult.error).toString();
+      res.status(400).json({ error: errorMessage });
+      return;
+    }
+    
+    const updatedTemplate = await projectsRepository.updateTemplate(templateId, validationResult.data);
+    
+    if (!updatedTemplate) {
+      res.status(404).json({ error: "Process template not found" });
+      return;
+    }
+    
+    res.json(updatedTemplate);
+  } catch (error) {
+    console.error("Error updating process template:", error);
+    res.status(500).json({ error: "Failed to update process template" });
+  }
+});
+
+// DELETE /api/process-templates/:templateId - Delete template
+router.delete("/api/process-templates/:templateId", async (req, res) => {
+  try {
+    const { templateId } = req.params;
+    const deleted = await projectsRepository.deleteTemplate(templateId);
+    
+    if (!deleted) {
+      res.status(404).json({ error: "Process template not found" });
+      return;
+    }
+    
+    res.status(204).send();
+  } catch (error) {
+    console.error("Error deleting process template:", error);
+    res.status(500).json({ error: "Failed to delete process template" });
+  }
+});
+
+// POST /api/process-templates/:templateId/apply - Apply template to item
+router.post("/api/process-templates/:templateId/apply", async (req, res) => {
+  try {
+    const { templateId } = req.params;
+    const { item_id } = req.body;
+    
+    if (!item_id) {
+      res.status(400).json({ error: "item_id is required" });
+      return;
+    }
+    
+    const result = await projectsRepository.applyTemplateToItem(templateId, item_id);
+    res.status(201).json(result);
+  } catch (error) {
+    console.error("Error applying template:", error);
+    res.status(500).json({ error: "Failed to apply template" });
+  }
+});
+
+// ===== Template Stages Routes =====
+
+// GET /api/process-templates/:templateId/stages - Get template stages
+router.get("/api/process-templates/:templateId/stages", async (req, res) => {
+  try {
+    const { templateId } = req.params;
+    const stages = await projectsRepository.getTemplateStages(templateId);
+    res.json(stages);
+  } catch (error) {
+    console.error("Error fetching template stages:", error);
+    res.status(500).json({ error: "Failed to fetch template stages" });
+  }
+});
+
+// POST /api/process-templates/:templateId/stages - Create template stage
+router.post("/api/process-templates/:templateId/stages", async (req, res) => {
+  try {
+    const { templateId } = req.params;
+    
+    const validationResult = insertTemplateStageSchema.safeParse({
+      ...req.body,
+      template_id: templateId
+    });
+    
+    if (!validationResult.success) {
+      const errorMessage = fromZodError(validationResult.error).toString();
+      res.status(400).json({ error: errorMessage });
+      return;
+    }
+    
+    const newStage = await projectsRepository.createTemplateStage(validationResult.data);
+    res.status(201).json(newStage);
+  } catch (error) {
+    console.error("Error creating template stage:", error);
+    res.status(500).json({ error: "Failed to create template stage" });
+  }
+});
+
+// PUT /api/template-stages/:stageId - Update template stage
+router.put("/api/template-stages/:stageId", async (req, res) => {
+  try {
+    const { stageId } = req.params;
+    
+    const validationResult = insertTemplateStageSchema.partial().safeParse(req.body);
+    
+    if (!validationResult.success) {
+      const errorMessage = fromZodError(validationResult.error).toString();
+      res.status(400).json({ error: errorMessage });
+      return;
+    }
+    
+    const updatedStage = await projectsRepository.updateTemplateStage(stageId, validationResult.data);
+    
+    if (!updatedStage) {
+      res.status(404).json({ error: "Template stage not found" });
+      return;
+    }
+    
+    res.json(updatedStage);
+  } catch (error) {
+    console.error("Error updating template stage:", error);
+    res.status(500).json({ error: "Failed to update template stage" });
+  }
+});
+
+// DELETE /api/template-stages/:stageId - Delete template stage
+router.delete("/api/template-stages/:stageId", async (req, res) => {
+  try {
+    const { stageId } = req.params;
+    const deleted = await projectsRepository.deleteTemplateStage(stageId);
+    
+    if (!deleted) {
+      res.status(404).json({ error: "Template stage not found" });
+      return;
+    }
+    
+    res.status(204).send();
+  } catch (error) {
+    console.error("Error deleting template stage:", error);
+    res.status(500).json({ error: "Failed to delete template stage" });
+  }
+});
+
+// ===== Template Dependencies Routes =====
+
+// POST /api/template-stages/:stageId/dependencies - Create template dependency
+router.post("/api/template-stages/:stageId/dependencies", async (req, res) => {
+  try {
+    const { stageId } = req.params;
+    
+    const validationResult = insertTemplateDependencySchema.safeParse({
+      template_stage_id: stageId,
+      depends_on_template_stage_id: req.body.depends_on_template_stage_id
+    });
+    
+    if (!validationResult.success) {
+      const errorMessage = fromZodError(validationResult.error).toString();
+      res.status(400).json({ error: errorMessage });
+      return;
+    }
+    
+    const newDependency = await projectsRepository.createTemplateDependency(validationResult.data);
+    res.status(201).json(newDependency);
+  } catch (error) {
+    console.error("Error creating template dependency:", error);
+    res.status(500).json({ error: "Failed to create template dependency" });
+  }
+});
+
+// DELETE /api/template-dependencies/:dependencyId - Delete template dependency
+router.delete("/api/template-dependencies/:dependencyId", async (req, res) => {
+  try {
+    const { dependencyId } = req.params;
+    const deleted = await projectsRepository.deleteTemplateDependency(dependencyId);
+    
+    if (!deleted) {
+      res.status(404).json({ error: "Template dependency not found" });
+      return;
+    }
+    
+    res.status(204).send();
+  } catch (error) {
+    console.error("Error deleting template dependency:", error);
+    res.status(500).json({ error: "Failed to delete template dependency" });
+  }
+});
+
+// ===== Stage Messages Routes =====
+
+// GET /api/stages/:stageId/messages - Get stage messages
+router.get("/api/stages/:stageId/messages", async (req, res) => {
+  try {
+    const { stageId } = req.params;
+    const messages = await projectsRepository.getStageMessages(stageId);
+    res.json(messages);
+  } catch (error) {
+    console.error("Error fetching stage messages:", error);
+    res.status(500).json({ error: "Failed to fetch stage messages" });
+  }
+});
+
+// POST /api/stages/:stageId/messages - Create stage message
+router.post("/api/stages/:stageId/messages", async (req, res) => {
+  try {
+    const { stageId } = req.params;
+    
+    const validationResult = insertStageMessageSchema.safeParse({
+      stage_id: stageId,
+      user_id: req.body.user_id,
+      message: req.body.message
+    });
+    
+    if (!validationResult.success) {
+      const errorMessage = fromZodError(validationResult.error).toString();
+      res.status(400).json({ error: errorMessage });
+      return;
+    }
+    
+    const newMessage = await projectsRepository.createStageMessage(validationResult.data);
+    res.status(201).json(newMessage);
+  } catch (error) {
+    console.error("Error creating stage message:", error);
+    res.status(500).json({ error: "Failed to create stage message" });
   }
 });
