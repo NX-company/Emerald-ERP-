@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Calendar, DollarSign, Send, Paperclip } from "lucide-react";
+import { Calendar, DollarSign, Send, Paperclip, FileText, Download } from "lucide-react";
 
 interface StageDetailViewProps {
   stageId: string;
@@ -28,12 +29,18 @@ export function StageDetailView({
 }: StageDetailViewProps) {
   const { toast } = useToast();
   const [newMessage, setNewMessage] = useState("");
+  const [uploadingFile, setUploadingFile] = useState(false);
   
   const userStr = localStorage.getItem("user");
   const user = userStr ? JSON.parse(userStr) : null;
 
   const { data: messages = [] } = useQuery<any[]>({
     queryKey: ["/api/stages", stageId, "messages"],
+    enabled: !!stageId,
+  });
+
+  const { data: documents = [] } = useQuery<any[]>({
+    queryKey: ["/api/stages", stageId, "documents"],
     enabled: !!stageId,
   });
 
@@ -59,6 +66,30 @@ export function StageDetailView({
   const handleSendMessage = () => {
     if (!newMessage.trim()) return;
     createMessageMutation.mutate(newMessage);
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingFile(true);
+    try {
+      // For now, just create a document record without actual file upload
+      await apiRequest("POST", "/api/documents", {
+        name: file.name,
+        type: "stage_file",
+        file_url: "", // Will be updated when Object Storage is integrated
+        project_stage_id: stageId,
+      });
+      
+      queryClient.invalidateQueries({ queryKey: ["/api/stages", stageId, "documents"] });
+      toast({ description: "Файл добавлен" });
+    } catch (error) {
+      toast({ description: "Ошибка загрузки файла", variant: "destructive" });
+    } finally {
+      setUploadingFile(false);
+      e.target.value = "";
+    }
   };
 
   return (
@@ -99,6 +130,42 @@ export function StageDetailView({
 
       <Card>
         <CardHeader>
+          <CardTitle className="text-base">Документы этапа</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {documents.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center">Нет документов</p>
+          ) : (
+            <div className="space-y-2">
+              {documents.map((doc) => (
+                <div key={doc.id} className="flex items-center justify-between p-2 border rounded-md">
+                  <div className="flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm">{doc.name}</span>
+                  </div>
+                  {doc.file_url && (
+                    <Button size="sm" variant="ghost" data-testid={`button-download-${doc.id}`}>
+                      <Download className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="relative">
+            <Input
+              type="file"
+              onChange={handleFileUpload}
+              disabled={uploadingFile}
+              className="cursor-pointer"
+              data-testid="input-file-upload"
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle className="text-base">Чат этапа</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -133,23 +200,14 @@ export function StageDetailView({
               }}
               data-testid="textarea-stage-message"
             />
-            <div className="flex flex-col gap-2">
-              <Button
-                size="icon"
-                onClick={handleSendMessage}
-                disabled={!newMessage.trim() || createMessageMutation.isPending}
-                data-testid="button-send-message"
-              >
-                <Send className="w-4 h-4" />
-              </Button>
-              <Button
-                size="icon"
-                variant="outline"
-                data-testid="button-attach-file"
-              >
-                <Paperclip className="w-4 h-4" />
-              </Button>
-            </div>
+            <Button
+              size="icon"
+              onClick={handleSendMessage}
+              disabled={!newMessage.trim() || createMessageMutation.isPending}
+              data-testid="button-send-message"
+            >
+              <Send className="w-4 h-4" />
+            </Button>
           </div>
         </CardContent>
       </Card>

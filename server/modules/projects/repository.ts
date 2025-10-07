@@ -514,6 +514,14 @@ export class ProjectsRepository {
     return result[0];
   }
 
+  // Stage Documents methods
+  async getStageDocuments(stageId: string): Promise<Document[]> {
+    return await db.select()
+      .from(documents)
+      .where(eq(documents.project_stage_id, stageId))
+      .orderBy(asc(documents.created_at));
+  }
+
   // Reorder item stages atomically
   async reorderItemStages(itemId: string, stageIds: string[]): Promise<void> {
     await db.transaction(async (tx) => {

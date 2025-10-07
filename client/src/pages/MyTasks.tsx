@@ -1,11 +1,15 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { StageDetailView } from "@/components/StageDetailView";
 import { Calendar, DollarSign } from "lucide-react";
 
 export default function MyTasks() {
   const userStr = localStorage.getItem("user");
   const user = userStr ? JSON.parse(userStr) : null;
+  const [selectedStage, setSelectedStage] = useState<any>(null);
 
   const { data: tasks = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/my-tasks", user?.id],
@@ -32,7 +36,12 @@ export default function MyTasks() {
       ) : (
         <div className="grid gap-4">
           {tasks.map((task) => (
-            <Card key={task.id} data-testid={`task-${task.id}`}>
+            <Card 
+              key={task.id} 
+              data-testid={`task-${task.id}`}
+              className="hover-elevate cursor-pointer"
+              onClick={() => setSelectedStage(task)}
+            >
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div>
@@ -71,6 +80,24 @@ export default function MyTasks() {
           ))}
         </div>
       )}
+
+      <Dialog open={!!selectedStage} onOpenChange={(open) => !open && setSelectedStage(null)}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Детали этапа</DialogTitle>
+          </DialogHeader>
+          {selectedStage && (
+            <StageDetailView
+              stageId={selectedStage.id}
+              stageName={selectedStage.name}
+              stageStatus={selectedStage.status}
+              stageDescription={selectedStage.description}
+              stageDeadline={selectedStage.end_date}
+              stageCost={selectedStage.cost}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

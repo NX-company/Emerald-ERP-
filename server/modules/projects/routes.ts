@@ -813,3 +813,15 @@ router.post("/api/stages/:stageId/messages", async (req, res) => {
     res.status(500).json({ error: "Failed to create stage message" });
   }
 });
+
+// GET /api/stages/:stageId/documents - Get stage documents
+router.get("/api/stages/:stageId/documents", async (req, res) => {
+  try {
+    const { stageId } = req.params;
+    const documents = await projectsRepository.getStageDocuments(stageId);
+    res.json(documents);
+  } catch (error) {
+    console.error("Error fetching stage documents:", error);
+    res.status(500).json({ error: "Failed to fetch stage documents" });
+  }
+});
