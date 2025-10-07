@@ -40,6 +40,7 @@ const modules = [
 const tools = [
   { title: "Почта", url: "/mail", icon: Mail },
   { title: "Задачи", url: "/tasks", icon: CheckSquare },
+  { title: "Мои задачи", url: "/my-tasks", icon: CheckSquare },
   { title: "Документы", url: "/documents", icon: FileText },
   { title: "ИИ Агенты", url: "/ai-agents", icon: Bot },
 ];

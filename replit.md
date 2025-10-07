@@ -33,7 +33,17 @@ Preferred communication style: Simple, everyday language.
 
 **Database**: PostgreSQL (Neon serverless), connection pooling.
 **Schema Design**: Core entities (users, deals, projects, etc.) with foreign key relationships, enums for controlled vocabularies, UUID primary keys, and audit timestamps.
-**Projects Module Schema**: Enhanced for project management with Gantt charts - includes project_items (furniture positions from invoices), extended project_stages (with assignee, dates, cost, description), stage_dependencies (for workflow dependencies), process_templates & template_stages (reusable process templates), stage_messages (stage-level chat), projects.invoice_id (link to source invoice).
+**Projects Module Schema**: Enhanced for comprehensive project and stage lifecycle management:
+- `project_items`: Furniture positions from invoices
+- `project_stages`: Extended with `assignee_id`, `assignee_role`, `duration_days`, `start_date`, `end_date`, `cost`, `description` for detailed stage parameters
+- `template_stages`: Process template stages with `assignee_role`, `duration_days`, `cost`, `description` for reusable templates
+- `stage_dependencies`: Workflow dependencies between stages
+- `process_templates`: Reusable process templates for project creation
+- `stage_messages`: Stage-level chat for executor communication
+- `documents`: Document storage with `project_stage_id` and `template_stage_id` for stage-specific file uploads
+- `projects.invoice_id`: Links projects to source invoices
+- MyTasks page (`/my-tasks`): Dedicated view for executors to track assigned stages with filtering
+- StageDetailView component: Integrated stage management with chat, file upload, and progress tracking
 **File Storage**: Document management tracks metadata in DB; actual file storage through Replit Object Storage with ACL-based access control.
 
 ## External Dependencies
