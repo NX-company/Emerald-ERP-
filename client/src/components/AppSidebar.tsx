@@ -11,6 +11,7 @@ import {
   FileText,
   Bot,
   Settings,
+  FileStack,
 } from "lucide-react";
 import {
   Sidebar,
@@ -44,6 +45,7 @@ const tools = [
 ];
 
 const settings = [
+  { title: "Шаблоны процессов", url: "/process-templates", icon: FileStack },
   { title: "Настройки", url: "/settings", icon: Settings },
 ];
 

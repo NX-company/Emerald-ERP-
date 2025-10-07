@@ -19,6 +19,7 @@ import Tasks from "@/pages/Tasks";
 import Documents from "@/pages/Documents";
 import AIAgents from "@/pages/AIAgents";
 import Settings from "@/pages/Settings";
+import ProcessTemplates from "@/pages/ProcessTemplates";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -36,6 +37,7 @@ function Router() {
       <Route path="/tasks" component={Tasks} />
       <Route path="/documents" component={Documents} />
       <Route path="/ai-agents" component={AIAgents} />
+      <Route path="/process-templates" component={ProcessTemplates} />
       <Route path="/settings" component={Settings} />
       <Route component={NotFound} />
     </Switch>
