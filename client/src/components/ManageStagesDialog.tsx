@@ -268,13 +268,6 @@ export function ManageStagesDialog({ open, onOpenChange }: ManageStagesDialogPro
       }
       
       await Promise.all(updates);
-      
-      const reorderData = stages.map((stage) => ({
-        id: stage.id,
-        order: stage.order,
-      }));
-      
-      await apiRequest("PUT", "/api/deal-stages/reorder", { stages: reorderData });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/deal-stages"] });
