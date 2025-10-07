@@ -381,6 +381,17 @@ export class ProjectsRepository {
     const result = await db.insert(stage_messages).values(data).returning();
     return result[0];
   }
+
+  // Reorder item stages atomically
+  async reorderItemStages(itemId: string, stageIds: string[]): Promise<void> {
+    await db.transaction(async (tx) => {
+      for (let i = 0; i < stageIds.length; i++) {
+        await tx.update(project_stages)
+          .set({ order: i })
+          .where(eq(project_stages.id, stageIds[i]));
+      }
+    });
+  }
 }
 
 export const projectsRepository = new ProjectsRepository();

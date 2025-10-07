@@ -392,6 +392,56 @@ router.get("/api/projects/:projectId/items/:itemId/stages", async (req, res) => 
   }
 });
 
+// PATCH /api/projects/:projectId/items/:itemId/stages/reorder - Reorder stages atomically
+router.patch("/api/projects/:projectId/items/:itemId/stages/reorder", async (req, res) => {
+  try {
+    const { itemId } = req.params;
+    
+    const requestSchema = z.object({
+      stageIds: z.array(z.string()).min(1, "stageIds array must not be empty")
+    });
+    
+    const validationResult = requestSchema.safeParse(req.body);
+    
+    if (!validationResult.success) {
+      const errorMessage = fromZodError(validationResult.error).toString();
+      res.status(400).json({ error: errorMessage });
+      return;
+    }
+    
+    const { stageIds } = validationResult.data;
+    
+    // Validate that all stageIds belong to this item
+    const itemStages = await projectsRepository.getItemStages(itemId);
+    const itemStageIds = itemStages.map(s => s.id);
+    
+    // Check if count matches
+    if (stageIds.length !== itemStages.length) {
+      res.status(400).json({ 
+        error: `Invalid stageIds count. Expected ${itemStages.length}, got ${stageIds.length}` 
+      });
+      return;
+    }
+    
+    // Check if all stageIds belong to this item
+    const invalidIds = stageIds.filter(id => !itemStageIds.includes(id));
+    if (invalidIds.length > 0) {
+      res.status(400).json({ 
+        error: `Some stage IDs do not belong to this item: ${invalidIds.join(', ')}` 
+      });
+      return;
+    }
+    
+    // Perform atomic reorder
+    await projectsRepository.reorderItemStages(itemId, stageIds);
+    
+    res.status(200).json({ success: true });
+  } catch (error) {
+    console.error("Error reordering item stages:", error);
+    res.status(500).json({ error: "Failed to reorder item stages" });
+  }
+});
+
 // ===== Stage Dependencies Routes =====
 
 // GET /api/projects/:projectId/dependencies - Get all dependencies for a project

@@ -11,13 +11,14 @@ import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { 
   ArrowLeft, Plus, Edit, Trash2, Calendar, FileText, Layers, 
-  AlertCircle
+  AlertCircle, GripVertical, MessageSquare
 } from "lucide-react";
 import { ProjectItemDialog } from "@/components/ProjectItemDialog";
+import { StageDialog } from "@/components/StageDialog";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Project, ProjectItem, ProjectStage } from "@shared/schema";
+import type { Project, ProjectItem, ProjectStage, User } from "@shared/schema";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,6 +29,170 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { DndContext, closestCenter, DragEndEvent } from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { format } from "date-fns";
+
+// StageCard component with drag&drop functionality
+interface StageCardProps {
+  stage: ProjectStage;
+  users: User[];
+  onEdit: (stage: ProjectStage) => void;
+  onDelete: (stageId: string) => void;
+  formatDate: (date: Date | null) => string;
+  formatCurrency: (amount: string | null) => string;
+}
+
+function StageCard({ stage, users, onEdit, onDelete, formatDate, formatCurrency }: StageCardProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: stage.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  const assignee = users.find((u) => u.id === stage.assignee_id);
+  const progressValue = stage.status === "completed" ? 100 : stage.status === "in_progress" ? 50 : 0;
+
+  return (
+    <Card
+      ref={setNodeRef}
+      style={style}
+      className="p-4 space-y-3"
+      data-testid={`card-stage-${stage.id}`}
+    >
+      <div className="flex items-start gap-3">
+        <button
+          className="cursor-grab active:cursor-grabbing mt-1"
+          {...attributes}
+          {...listeners}
+          data-testid={`handle-stage-${stage.id}`}
+        >
+          <GripVertical className="w-4 h-4 text-muted-foreground" />
+        </button>
+
+        <div className="flex-1 space-y-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="space-y-1 flex-1">
+              <h4 className="font-medium" data-testid={`text-stage-name-${stage.id}`}>
+                {stage.name}
+              </h4>
+              {stage.description && (
+                <p className="text-sm text-muted-foreground" data-testid={`text-stage-description-${stage.id}`}>
+                  {stage.description}
+                </p>
+              )}
+            </div>
+            <StatusBadge status={stage.status} data-testid={`badge-stage-status-${stage.id}`} />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="space-y-1">
+              <p className="text-muted-foreground text-xs">Даты</p>
+              <p data-testid={`text-stage-dates-${stage.id}`}>
+                {formatDate(stage.start_date)} - {formatDate(stage.end_date)}
+              </p>
+            </div>
+
+            <div className="space-y-1">
+              <p className="text-muted-foreground text-xs">Исполнитель</p>
+              <p data-testid={`text-stage-assignee-${stage.id}`}>
+                {assignee ? (assignee.full_name || assignee.username) : "Не назначен"}
+              </p>
+            </div>
+
+            {stage.cost && (
+              <div className="space-y-1">
+                <p className="text-muted-foreground text-xs">Стоимость</p>
+                <p className="font-semibold" data-testid={`text-stage-cost-${stage.id}`}>
+                  {formatCurrency(stage.cost)}
+                </p>
+              </div>
+            )}
+
+            <div className="space-y-1">
+              <p className="text-muted-foreground text-xs">Прогресс</p>
+              <div className="space-y-1">
+                <Progress value={progressValue} data-testid={`progress-stage-${stage.id}`} />
+                <p className="text-xs" data-testid={`text-stage-progress-${stage.id}`}>
+                  {progressValue}%
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <Separator />
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => onEdit(stage)}
+              data-testid={`button-edit-stage-${stage.id}`}
+            >
+              <Edit className="w-3 h-3 mr-1" />
+              Изменить
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => onDelete(stage.id)}
+              data-testid={`button-delete-stage-${stage.id}`}
+            >
+              <Trash2 className="w-3 h-3 mr-1" />
+              Удалить
+            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled
+                    data-testid={`button-documents-stage-${stage.id}`}
+                  >
+                    <FileText className="w-3 h-3 mr-1" />
+                    Документы
+                  </Button>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Будет доступно позже</p>
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled
+                    data-testid={`button-chat-stage-${stage.id}`}
+                  >
+                    <MessageSquare className="w-3 h-3 mr-1" />
+                    Чат
+                  </Button>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Будет доступно позже</p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+}
 
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -39,6 +204,12 @@ export default function ProjectDetailPage() {
   const [editingItem, setEditingItem] = useState<ProjectItem | undefined>();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
+  
+  // Stage dialog state
+  const [stageDialogOpen, setStageDialogOpen] = useState(false);
+  const [editingStage, setEditingStage] = useState<ProjectStage | undefined>();
+  const [deleteStageDialogOpen, setDeleteStageDialogOpen] = useState(false);
+  const [stageToDelete, setStageToDelete] = useState<string | null>(null);
 
   const { data: project, isLoading: projectLoading } = useQuery<Project & { stages: ProjectStage[] }>({
     queryKey: ['/api/projects', id],
@@ -48,6 +219,17 @@ export default function ProjectDetailPage() {
   const { data: items = [], isLoading: itemsLoading } = useQuery<ProjectItem[]>({
     queryKey: ['/api/projects', id, 'items'],
     enabled: !!id,
+  });
+
+  // Query stages for selected item
+  const { data: stages = [], isLoading: stagesLoading } = useQuery<ProjectStage[]>({
+    queryKey: ['/api/projects', id, 'items', selectedItemId, 'stages'],
+    enabled: !!id && !!selectedItemId,
+  });
+
+  // Query users for assignee select
+  const { data: users = [] } = useQuery<User[]>({
+    queryKey: ['/api/users'],
   });
 
   const deleteMutation = useMutation({
@@ -110,7 +292,98 @@ export default function ProjectDetailPage() {
     }
   };
 
+  // Stage handlers
+  const handleAddStage = () => {
+    setEditingStage(undefined);
+    setStageDialogOpen(true);
+  };
+
+  const handleEditStage = (stage: ProjectStage) => {
+    setEditingStage(stage);
+    setStageDialogOpen(true);
+  };
+
+  const handleDeleteStage = (stageId: string) => {
+    setStageToDelete(stageId);
+    setDeleteStageDialogOpen(true);
+  };
+
+  const deleteStage = useMutation({
+    mutationFn: async (stageId: string) => {
+      return await apiRequest('DELETE', `/api/projects/stages/${stageId}`);
+    },
+    onSuccess: () => {
+      if (selectedItemId) {
+        queryClient.invalidateQueries({ queryKey: ['/api/projects', id, 'items', selectedItemId, 'stages'] });
+      }
+      toast({
+        title: "Этап удален",
+        description: "Этап успешно удален",
+      });
+      setDeleteStageDialogOpen(false);
+      setStageToDelete(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Ошибка",
+        description: error.message || "Не удалось удалить этап",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const confirmDeleteStage = () => {
+    if (stageToDelete) {
+      deleteStage.mutate(stageToDelete);
+    }
+  };
+
+  const reorderStages = useMutation({
+    mutationFn: async (stageIds: string[]) => 
+      apiRequest('PATCH', `/api/projects/${id}/items/${selectedItemId}/stages/reorder`, {
+        stageIds
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ 
+        queryKey: ['/api/projects', id, 'items', selectedItemId, 'stages'] 
+      });
+      toast({ 
+        title: "Порядок этапов обновлён",
+        description: "Порядок этапов успешно изменен",
+      });
+    },
+    onError: () => {
+      queryClient.invalidateQueries({ 
+        queryKey: ['/api/projects', id, 'items', selectedItemId, 'stages'] 
+      });
+      toast({ 
+        title: "Ошибка", 
+        description: "Не удалось обновить порядок", 
+        variant: "destructive" 
+      });
+    }
+  });
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = stages.findIndex(s => s.id === active.id);
+    const newIndex = stages.findIndex(s => s.id === over.id);
+    
+    // Optimistic update
+    const reordered = arrayMove(stages, oldIndex, newIndex);
+    queryClient.setQueryData(
+      ['/api/projects', id, 'items', selectedItemId, 'stages'],
+      reordered
+    );
+
+    // Single atomic API call
+    reorderStages.mutate(reordered.map(s => s.id));
+  };
+
   const selectedItem = items.find(item => item.id === selectedItemId);
+  const sortedStages = [...stages].sort((a, b) => a.order - b.order);
 
   if (projectLoading) {
     return (
@@ -349,30 +622,65 @@ export default function ProjectDetailPage() {
             </TabsList>
 
             <TabsContent value="constructor" className="mt-6" data-testid="content-constructor">
-              {selectedItem ? (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold" data-testid="text-stages-title">
-                      Этапы для позиции: {selectedItem.name}
-                    </h3>
-                  </div>
-                  <Separator />
-                  <div className="text-center py-12 space-y-2">
-                    <Layers className="w-12 h-12 mx-auto text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground" data-testid="text-empty-stages">
-                      Этапы пока не добавлены
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Функционал будет добавлен в следующей версии
-                    </p>
-                  </div>
-                </div>
-              ) : (
+              {!selectedItem ? (
                 <div className="text-center py-12 space-y-2">
                   <AlertCircle className="w-12 h-12 mx-auto text-muted-foreground" />
                   <p className="text-sm text-muted-foreground" data-testid="text-no-selection">
                     Выберите позицию слева для управления этапами
                   </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between gap-4 flex-wrap">
+                    <h3 className="text-lg font-semibold" data-testid="text-stages-title">
+                      Этапы для позиции: {selectedItem.name}
+                    </h3>
+                    <Button
+                      onClick={handleAddStage}
+                      data-testid="button-add-stage"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Добавить этап
+                    </Button>
+                  </div>
+
+                  <Separator />
+
+                  {stagesLoading ? (
+                    <div className="space-y-3">
+                      {[1, 2, 3].map((i) => (
+                        <Skeleton key={i} className="h-40" data-testid={`skeleton-stage-${i}`} />
+                      ))}
+                    </div>
+                  ) : sortedStages.length === 0 ? (
+                    <div className="text-center py-12 space-y-2">
+                      <Layers className="w-12 h-12 mx-auto text-muted-foreground" />
+                      <p className="text-sm text-muted-foreground" data-testid="text-empty-stages">
+                        Этапов пока нет
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Добавьте первый этап или примените шаблон процесса
+                      </p>
+                    </div>
+                  ) : (
+                    <DndContext onDragEnd={handleDragEnd} collisionDetection={closestCenter}>
+                      <SortableContext items={sortedStages.map((s) => s.id)} strategy={verticalListSortingStrategy}>
+                        <div className="space-y-3" data-testid="list-stages">
+                          {sortedStages.map((stage) => (
+                            <StageCard
+                              key={stage.id}
+                              stage={stage}
+                              users={users}
+                              onEdit={handleEditStage}
+                              onDelete={handleDeleteStage}
+                              formatDate={formatDate}
+                              formatCurrency={formatCurrency}
+                            />
+                          ))}
+                        </div>
+                      </SortableContext>
+                    </DndContext>
+                  )}
                 </div>
               )}
             </TabsContent>
@@ -425,6 +733,39 @@ export default function ProjectDetailPage() {
               data-testid="button-confirm-delete"
             >
               {deleteMutation.isPending ? "Удаление..." : "Удалить"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <StageDialog
+        open={stageDialogOpen}
+        onOpenChange={setStageDialogOpen}
+        projectId={id!}
+        itemId={selectedItemId || undefined}
+        stage={editingStage}
+      />
+
+      <AlertDialog open={deleteStageDialogOpen} onOpenChange={setDeleteStageDialogOpen}>
+        <AlertDialogContent data-testid="dialog-delete-stage">
+          <AlertDialogHeader>
+            <AlertDialogTitle data-testid="text-delete-stage-title">
+              Удалить этап?
+            </AlertDialogTitle>
+            <AlertDialogDescription data-testid="text-delete-stage-description">
+              Это действие нельзя отменить. Этап будет удален навсегда.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-stage">
+              Отмена
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteStage}
+              disabled={deleteStage.isPending}
+              data-testid="button-confirm-delete-stage"
+            >
+              {deleteStage.isPending ? "Удаление..." : "Удалить"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
