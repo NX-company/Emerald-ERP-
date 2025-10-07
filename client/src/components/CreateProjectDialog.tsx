@@ -11,7 +11,9 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
-import { Loader2, Edit2, Plus, Trash2 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Loader2, Edit2, Plus, Trash2, Settings2, ArrowLeft } from "lucide-react";
+import { StageFlowEditor } from "./StageFlowEditor";
 
 interface InvoicePosition {
   name: string;
@@ -40,11 +42,15 @@ export function CreateProjectDialog({
   const [positions, setPositions] = useState<InvoicePosition[]>([]);
   const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [currentTab, setCurrentTab] = useState<"positions" | "stages">("positions");
+  const [selectedPositionForStages, setSelectedPositionForStages] = useState<number | null>(null);
 
   useEffect(() => {
     if (open && invoicePositions.length > 0) {
       setPositions([...invoicePositions]);
       setSelectedIndices(new Set(invoicePositions.map((_, i) => i)));
+      setCurrentTab("positions");
+      setSelectedPositionForStages(null);
     }
   }, [open, invoicePositions]);
 
@@ -73,7 +79,7 @@ export function CreateProjectDialog({
       price: "0",
     };
     setPositions([...positions, newPosition]);
-    setSelectedIndices(new Set([...selectedIndices, positions.length]));
+    setSelectedIndices(new Set(Array.from(selectedIndices).concat(positions.length)));
     setEditingIndex(positions.length);
   };
 
@@ -102,18 +108,51 @@ export function CreateProjectDialog({
     onCreateProject(Array.from(selectedIndices), positions);
   };
 
+  const goToStages = (index: number) => {
+    setSelectedPositionForStages(index);
+    setCurrentTab("stages");
+  };
+
+  const backToPositions = () => {
+    setSelectedPositionForStages(null);
+    setCurrentTab("positions");
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl" data-testid="dialog-create-project">
+      <DialogContent className="max-w-4xl max-h-[90vh]" data-testid="dialog-create-project">
         <DialogHeader>
-          <DialogTitle>Создать проект из счёта</DialogTitle>
+          {currentTab === "stages" && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={backToPositions}
+              className="mb-2 w-fit"
+              data-testid="button-back-to-positions"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Назад к позициям
+            </Button>
+          )}
+          <DialogTitle>
+            {currentTab === "positions" 
+              ? "Создать проект из счёта" 
+              : `Настройка этапов: ${positions[selectedPositionForStages!]?.name}`
+            }
+          </DialogTitle>
           <DialogDescription>
-            Выберите позиции из счёта, которые войдут в проект "{dealName}"
+            {currentTab === "positions" 
+              ? `Выберите позиции из счёта, которые войдут в проект "${dealName}"`
+              : "Добавьте этапы и свяжите их зависимостями. После создания проекта этапы будут доступны для редактирования."
+            }
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
-          <div className="flex items-center justify-between gap-2 pb-2 border-b">
+        <>
+          {currentTab === "positions" ? (
+            <div className="space-y-4">
+            <div className="flex items-center justify-between gap-2 pb-2 border-b">
             <div className="flex items-center gap-2">
               <Checkbox
                 id="select-all"
@@ -220,6 +259,19 @@ export function CreateProjectDialog({
                       <div className="flex items-center gap-1">
                         <Button
                           type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            goToStages(index);
+                          }}
+                          data-testid={`button-stages-${index}`}
+                        >
+                          <Settings2 className="w-3 h-3 mr-1" />
+                          Этапы
+                        </Button>
+                        <Button
+                          type="button"
                           size="icon"
                           variant="ghost"
                           onClick={() => setEditingIndex(index)}
@@ -251,9 +303,21 @@ export function CreateProjectDialog({
               Выберите хотя бы одну позицию для создания проекта
             </p>
           )}
-        </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="p-4 bg-muted rounded-lg text-center">
+                <p className="text-sm text-muted-foreground">
+                  Настройка этапов будет доступна после создания проекта
+                </p>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Нажмите "Создать проект", затем откройте страницу проекта для настройки этапов
+                </p>
+              </div>
+            </div>
+          )}
 
-        <DialogFooter>
+          <DialogFooter>
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
@@ -270,7 +334,8 @@ export function CreateProjectDialog({
             {isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
             {isPending ? "Создание..." : "Создать проект"}
           </Button>
-        </DialogFooter>
+          </DialogFooter>
+        </>
       </DialogContent>
     </Dialog>
   );
