@@ -2,6 +2,8 @@ import { Router } from "express";
 import { projectsRepository } from "./repository";
 import { insertProjectSchema, insertProjectStageSchema } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
+import { salesRepository } from "../sales/repository";
+import { z } from "zod";
 
 export const router = Router();
 
@@ -20,6 +22,24 @@ router.get("/api/projects", async (req, res) => {
   } catch (error) {
     console.error("Error fetching projects:", error);
     res.status(500).json({ error: "Failed to fetch projects" });
+  }
+});
+
+// GET /api/projects/by-deal/:dealId - Get project by deal ID
+router.get("/api/projects/by-deal/:dealId", async (req, res) => {
+  try {
+    const { dealId } = req.params;
+    const project = await projectsRepository.getProjectByDealId(dealId);
+    
+    if (!project) {
+      res.status(404).json({ error: "Project not found" });
+      return;
+    }
+    
+    res.json(project);
+  } catch (error) {
+    console.error("Error fetching project by deal:", error);
+    res.status(500).json({ error: "Failed to fetch project" });
   }
 });
 
@@ -57,6 +77,55 @@ router.post("/api/projects", async (req, res) => {
   } catch (error) {
     console.error("Error creating project:", error);
     res.status(500).json({ error: "Failed to create project" });
+  }
+});
+
+// POST /api/projects/from-invoice - Create project from invoice
+router.post("/api/projects/from-invoice", async (req, res) => {
+  try {
+    const requestSchema = z.object({
+      dealId: z.string(),
+      invoiceId: z.string(),
+    });
+
+    const validationResult = requestSchema.safeParse(req.body);
+    
+    if (!validationResult.success) {
+      const errorMessage = fromZodError(validationResult.error).toString();
+      res.status(400).json({ error: errorMessage });
+      return;
+    }
+
+    const { dealId, invoiceId } = validationResult.data;
+
+    const deal = await salesRepository.getDealById(dealId);
+    if (!deal) {
+      res.status(404).json({ error: "Deal not found" });
+      return;
+    }
+
+    const invoice = await salesRepository.getDealDocumentById(invoiceId);
+    if (!invoice) {
+      res.status(404).json({ error: "Invoice not found" });
+      return;
+    }
+
+    if (invoice.document_type !== "invoice") {
+      res.status(400).json({ error: "Document is not an invoice" });
+      return;
+    }
+
+    const existingProject = await projectsRepository.getProjectByDealId(dealId);
+    if (existingProject) {
+      res.status(400).json({ error: "Project already exists for this deal" });
+      return;
+    }
+
+    const project = await projectsRepository.createProjectFromInvoice(dealId, invoiceId, deal, invoice);
+    res.status(201).json(project);
+  } catch (error) {
+    console.error("Error creating project from invoice:", error);
+    res.status(500).json({ error: "Failed to create project from invoice" });
   }
 });
 

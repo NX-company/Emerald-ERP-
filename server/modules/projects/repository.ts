@@ -1,7 +1,7 @@
 import { db } from "../../db";
 import { eq, asc } from "drizzle-orm";
-import type { Project, InsertProject, ProjectStage, InsertProjectStage } from "@shared/schema";
-import { projects, project_stages } from "@shared/schema";
+import type { Project, InsertProject, ProjectStage, InsertProjectStage, ProjectItem, InsertProjectItem } from "@shared/schema";
+import { projects, project_stages, project_items } from "@shared/schema";
 
 export class ProjectsRepository {
   // Project methods
@@ -113,6 +113,41 @@ export class ProjectsRepository {
     }
     
     return result.length > 0;
+  }
+
+  async getProjectByDealId(dealId: string): Promise<Project | undefined> {
+    const result = await db.select().from(projects).where(eq(projects.deal_id, dealId));
+    return result[0];
+  }
+
+  async createProjectFromInvoice(dealId: string, invoiceId: string, deal: any, invoice: any): Promise<Project> {
+    const projectData: InsertProject = {
+      name: `Проект №${invoice.name}`,
+      client_name: deal.client_name,
+      deal_id: dealId,
+      invoice_id: invoiceId,
+      deadline: deal.deadline,
+      manager_id: deal.manager_id,
+      status: "pending",
+      progress: 0,
+    };
+
+    const project = await this.createProject(projectData);
+
+    if (invoice.data?.positions && Array.isArray(invoice.data.positions)) {
+      const itemsData: InsertProjectItem[] = invoice.data.positions.map((position: any, index: number) => ({
+        project_id: project.id,
+        name: position.name,
+        quantity: position.quantity || 1,
+        price: position.price,
+        source_document_id: invoiceId,
+        order: index,
+      }));
+
+      await db.insert(project_items).values(itemsData);
+    }
+
+    return project;
   }
 }
 

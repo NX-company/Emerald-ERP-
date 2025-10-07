@@ -13,12 +13,13 @@ import { apiRequest, queryClient, getCurrentUserId } from "@/lib/queryClient";
 import { DocumentFormDialog } from "@/components/DocumentFormDialog";
 import { DeleteDealDialog } from "@/components/DeleteDealDialog";
 import { useToast } from "@/hooks/use-toast";
-import type { Deal, DealMessage, InsertDealMessage, DealDocument, User, DealStage, DealAttachment } from "@shared/schema";
+import type { Deal, DealMessage, InsertDealMessage, DealDocument, User, DealStage, DealAttachment, Project } from "@shared/schema";
 import { ObjectUploader } from "@/components/ObjectUploader";
 import { DealCustomFields } from "@/components/DealCustomFields";
 import { AllDocumentsDialog } from "@/components/AllDocumentsDialog";
 import type { UploadResult } from "@uppy/core";
 import { X, Download } from "lucide-react";
+import { useLocation } from "wouter";
 
 interface DealCardModalProps {
   dealId: string | null;
@@ -52,6 +53,11 @@ export function DealCardModal({ dealId, open, onOpenChange }: DealCardModalProps
     enabled: !!dealId && open,
   });
 
+  const { data: existingProject } = useQuery<Project>({
+    queryKey: [`/api/projects/by-deal/${dealId}`],
+    enabled: !!dealId && open,
+  });
+
   const [messageText, setMessageText] = useState("");
   const [messageType, setMessageType] = useState<"note" | "call" | "email" | "task">("note");
   
@@ -63,6 +69,7 @@ export function DealCardModal({ dealId, open, onOpenChange }: DealCardModalProps
   const [editingDocumentId, setEditingDocumentId] = useState<string | undefined>();
   
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
 
   const { data: currentUser } = useQuery<User>({
     queryKey: ['/api/users', getCurrentUserId()],
@@ -150,6 +157,41 @@ export function DealCardModal({ dealId, open, onOpenChange }: DealCardModalProps
       toast({
         title: "Ошибка",
         description: error.message || "Не удалось удалить файл",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const createProjectFromInvoice = useMutation<Project, Error, string>({
+    mutationFn: async (invoiceId: string) => {
+      const response = await apiRequest('POST', '/api/projects/from-invoice', {
+        dealId,
+        invoiceId,
+      });
+      return response as unknown as Project;
+    },
+    onSuccess: (project: Project) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/projects/by-deal/${dealId}`] });
+      toast({
+        title: "Проект создан",
+        description: "Проект успешно создан из счёта",
+      });
+      onOpenChange(false);
+      setLocation(`/projects/${project.id}`);
+    },
+    onError: (error: any) => {
+      let errorMessage = "Не удалось создать проект";
+      
+      if (error.message?.includes("Project already exists for this deal")) {
+        errorMessage = "Проект для этой сделки уже создан";
+      } else if (error.message?.includes("Document is not an invoice")) {
+        errorMessage = "Выбран не счёт";
+      }
+      
+      toast({
+        title: "Ошибка",
+        description: errorMessage,
         variant: "destructive",
       });
     },
@@ -477,16 +519,6 @@ export function DealCardModal({ dealId, open, onOpenChange }: DealCardModalProps
                     </Button>
                   </>
                 )}
-
-                {hasSignedContract && (
-                  <Button 
-                    className="w-full justify-start gap-2"
-                    data-testid="button-create-project"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Создать проект
-                  </Button>
-                )}
               </div>
 
               <Separator className="my-4" />
@@ -554,6 +586,22 @@ export function DealCardModal({ dealId, open, onOpenChange }: DealCardModalProps
                 <FolderOpen className="w-4 h-4" />
                 Документы
               </Button>
+
+              {/* Кнопка создать проект */}
+              {invoices.length > 0 && !existingProject && (
+                <>
+                  <Button 
+                    variant="outline"
+                    className="w-full justify-start gap-2"
+                    onClick={() => createProjectFromInvoice.mutate(invoices[0].id)}
+                    disabled={createProjectFromInvoice.isPending}
+                    data-testid="button-create-project"
+                  >
+                    <Plus className="w-4 h-4" />
+                    {createProjectFromInvoice.isPending ? "Создание..." : "Создать проект"}
+                  </Button>
+                </>
+              )}
 
               {/* Кнопка удаления */}
               {currentUser?.can_delete_deals && (
