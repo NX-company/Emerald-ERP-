@@ -277,3 +277,28 @@ Before marking any UI feature as complete:
 ❌ Create custom sidebar/mobile menu - use shadcn Sidebar
 ❌ Use nested scrolling containers (scroll within scroll)
 ❌ Modify existing responsive patterns without testing all breakpoints
+
+## Recent Changes
+
+### October 7, 2025 - Stage Management Fix
+**Problem**: When saving changes to deal stages (editing names, reordering, or creating new stages), the system showed "No values to set" error and changes were not persisted.
+
+**Root Cause**: 
+- ManageStagesDialog was making duplicate API calls:
+  1. First updating all stages via PUT/POST with `order` field included
+  2. Then calling `/api/deal-stages/reorder` with the same order values
+- For new stages, temporary IDs (`temp-${Date.now()}`) were being sent to reorder endpoint, which couldn't find them in database
+
+**Solution**: 
+- Removed redundant `/api/deal-stages/reorder` call from save flow
+- The `order` field is now set correctly during stage creation/update (PUT/POST)
+- This eliminates the duplicate update and prevents "No values to set" errors
+
+**Testing Confirmed**:
+- ✅ Single stage updates work (200 OK)
+- ✅ Parallel updates of multiple stages work (200 OK)  
+- ✅ New stage creation works (201 Created)
+- ✅ Stage order is preserved correctly
+- ✅ No "No values to set" errors in logs
+
+**Files Modified**: `client/src/components/ManageStagesDialog.tsx`
