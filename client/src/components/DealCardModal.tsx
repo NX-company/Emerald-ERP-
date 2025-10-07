@@ -164,13 +164,14 @@ export function DealCardModal({ dealId, open, onOpenChange }: DealCardModalProps
     },
   });
 
-  const createProjectFromInvoice = useMutation<Project, Error, { invoiceId: string; selectedPositions: number[]; editedPositions: any[] }>({
-    mutationFn: async ({ invoiceId, selectedPositions, editedPositions }) => {
+  const createProjectFromInvoice = useMutation<Project, Error, { invoiceId: string; selectedPositions: number[]; editedPositions: any[]; positionStagesData: any }>({
+    mutationFn: async ({ invoiceId, selectedPositions, editedPositions, positionStagesData }) => {
       const response = await apiRequest('POST', '/api/projects/from-invoice', {
         dealId,
         invoiceId,
         selectedPositions,
         editedPositions,
+        positionStagesData,
       });
       return response as unknown as Project;
     },
@@ -685,12 +686,13 @@ export function DealCardModal({ dealId, open, onOpenChange }: DealCardModalProps
             ? (invoices[0].data as any).positions
             : []
         }
-        onCreateProject={(selectedPositions, editedPositions) => {
+        onCreateProject={(selectedPositions, editedPositions, positionStagesData) => {
           if (invoices.length > 0) {
             createProjectFromInvoice.mutate({
               invoiceId: invoices[0].id,
               selectedPositions,
               editedPositions,
+              positionStagesData,
             });
           }
         }}

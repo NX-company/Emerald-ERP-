@@ -13,7 +13,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, Edit2, Plus, Trash2, Settings2, ArrowLeft } from "lucide-react";
-import { LocalStageEditor, LocalStage } from "./LocalStageEditor";
+import { LocalStageEditor, LocalStage, LocalStageDependency } from "./LocalStageEditor";
 
 interface InvoicePosition {
   name: string;
@@ -22,11 +22,20 @@ interface InvoicePosition {
   price: string;
 }
 
+interface PositionStagesData {
+  stages: LocalStage[];
+  dependencies: LocalStageDependency[];
+}
+
 interface CreateProjectDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   invoicePositions: InvoicePosition[];
-  onCreateProject: (selectedPositions: number[], editedPositions: InvoicePosition[]) => void;
+  onCreateProject: (
+    selectedPositions: number[], 
+    editedPositions: InvoicePosition[],
+    positionStagesData: Record<number, PositionStagesData>
+  ) => void;
   isPending: boolean;
   dealName: string;
 }
@@ -44,7 +53,7 @@ export function CreateProjectDialog({
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [currentTab, setCurrentTab] = useState<"positions" | "stages">("positions");
   const [selectedPositionForStages, setSelectedPositionForStages] = useState<number | null>(null);
-  const [positionStages, setPositionStages] = useState<Record<number, LocalStage[]>>({});
+  const [positionStagesData, setPositionStagesData] = useState<Record<number, PositionStagesData>>({});
 
   useEffect(() => {
     if (open && invoicePositions.length > 0) {
@@ -106,8 +115,7 @@ export function CreateProjectDialog({
   };
 
   const handleCreate = () => {
-    // TODO: В будущем передавать positionStages на backend для создания этапов
-    onCreateProject(Array.from(selectedIndices), positions);
+    onCreateProject(Array.from(selectedIndices), positions, positionStagesData);
   };
 
   const goToStages = (index: number) => {
@@ -310,11 +318,24 @@ export function CreateProjectDialog({
           ) : selectedPositionForStages !== null ? (
             <LocalStageEditor
               positionName={positions[selectedPositionForStages]?.name || ""}
-              stages={positionStages[selectedPositionForStages] || []}
+              stages={positionStagesData[selectedPositionForStages]?.stages || []}
+              dependencies={positionStagesData[selectedPositionForStages]?.dependencies || []}
               onStagesChange={(stages) => {
-                setPositionStages(prev => ({
+                setPositionStagesData(prev => ({
                   ...prev,
-                  [selectedPositionForStages]: stages
+                  [selectedPositionForStages]: {
+                    stages,
+                    dependencies: prev[selectedPositionForStages]?.dependencies || []
+                  }
+                }));
+              }}
+              onDependenciesChange={(dependencies) => {
+                setPositionStagesData(prev => ({
+                  ...prev,
+                  [selectedPositionForStages]: {
+                    stages: prev[selectedPositionForStages]?.stages || [],
+                    dependencies
+                  }
                 }));
               }}
             />
