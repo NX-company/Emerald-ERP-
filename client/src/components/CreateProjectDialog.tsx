@@ -13,7 +13,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, Edit2, Plus, Trash2, Settings2, ArrowLeft } from "lucide-react";
-import { StageFlowEditor } from "./StageFlowEditor";
+import { LocalStageEditor, LocalStage } from "./LocalStageEditor";
 
 interface InvoicePosition {
   name: string;
@@ -44,6 +44,7 @@ export function CreateProjectDialog({
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [currentTab, setCurrentTab] = useState<"positions" | "stages">("positions");
   const [selectedPositionForStages, setSelectedPositionForStages] = useState<number | null>(null);
+  const [positionStages, setPositionStages] = useState<Record<number, LocalStage[]>>({});
 
   useEffect(() => {
     if (open && invoicePositions.length > 0) {
@@ -105,6 +106,7 @@ export function CreateProjectDialog({
   };
 
   const handleCreate = () => {
+    // TODO: В будущем передавать positionStages на backend для создания этапов
     onCreateProject(Array.from(selectedIndices), positions);
   };
 
@@ -163,6 +165,7 @@ export function CreateProjectDialog({
               <label
                 htmlFor="select-all"
                 className="text-sm font-medium cursor-pointer"
+                data-testid="label-select-all"
               >
                 Выбрать все ({selectedIndices.size} из {positions.length})
               </label>
@@ -239,20 +242,20 @@ export function CreateProjectDialog({
                   ) : (
                     <div className="flex-1 flex items-start justify-between gap-4">
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm">
+                        <p className="font-medium text-sm" data-testid={`text-position-name-${index}`}>
                           {position.name}
                         </p>
                         {position.article && (
-                          <p className="text-xs text-muted-foreground mt-1">
+                          <p className="text-xs text-muted-foreground mt-1" data-testid={`text-position-article-${index}`}>
                             Артикул: {position.article}
                           </p>
                         )}
                       </div>
                       <div className="text-right shrink-0">
-                        <p className="text-sm font-medium">
+                        <p className="text-sm font-medium" data-testid={`text-position-price-${index}`}>
                           {parseFloat(position.price).toLocaleString('ru-RU')} ₽
                         </p>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-xs text-muted-foreground" data-testid={`text-position-quantity-${index}`}>
                           {position.quantity} шт.
                         </p>
                       </div>
@@ -299,23 +302,23 @@ export function CreateProjectDialog({
           </ScrollArea>
 
           {selectedIndices.size === 0 && (
-            <p className="text-sm text-destructive">
+            <p className="text-sm text-destructive" data-testid="text-validation-error">
               Выберите хотя бы одну позицию для создания проекта
             </p>
           )}
             </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="p-4 bg-muted rounded-lg text-center">
-                <p className="text-sm text-muted-foreground">
-                  Настройка этапов будет доступна после создания проекта
-                </p>
-                <p className="text-xs text-muted-foreground mt-2">
-                  Нажмите "Создать проект", затем откройте страницу проекта для настройки этапов
-                </p>
-              </div>
-            </div>
-          )}
+          ) : selectedPositionForStages !== null ? (
+            <LocalStageEditor
+              positionName={positions[selectedPositionForStages]?.name || ""}
+              stages={positionStages[selectedPositionForStages] || []}
+              onStagesChange={(stages) => {
+                setPositionStages(prev => ({
+                  ...prev,
+                  [selectedPositionForStages]: stages
+                }));
+              }}
+            />
+          ) : null}
 
           <DialogFooter>
           <Button
