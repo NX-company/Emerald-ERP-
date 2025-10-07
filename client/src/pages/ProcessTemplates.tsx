@@ -36,6 +36,11 @@ export default function ProcessTemplates() {
   const [stages, setStages] = useState<LocalStage[]>([]);
   const [dependencies, setDependencies] = useState<LocalStageDependency[]>([]);
 
+  // Fetch users
+  const { data: users = [] } = useQuery<Array<{ id: string; full_name?: string; username: string }>>({
+    queryKey: ["/api/users"],
+  });
+
   // Fetch templates
   const { data: templates = [], isLoading } = useQuery<ProcessTemplate[]>({
     queryKey: ["/api/templates"],
@@ -149,7 +154,7 @@ export default function ProcessTemplates() {
         name: s.name,
         order_index: s.order,
         duration_days: s.duration_days,
-        assignee_role: s.assignee_role,
+        assignee_id: s.assignee_id,
         cost: s.cost ? parseFloat(s.cost) : undefined,
         description: s.description,
       }));
@@ -189,8 +194,8 @@ export default function ProcessTemplates() {
             name: stage.name,
             order: stage.order_index,
             duration_days: stage.duration_days,
-            assignee_role: stage.assignee_role,
-            cost: stage.cost,
+            assignee_id: stage.assignee_id,
+            cost: stage.cost !== undefined ? String(stage.cost) : undefined,
             description: stage.description,
           }
         );
@@ -383,6 +388,8 @@ export default function ProcessTemplates() {
               dependencies={dependencies}
               onStagesChange={setStages}
               onDependenciesChange={setDependencies}
+              mode="template"
+              users={users}
             />
           </div>
           <DialogFooter>

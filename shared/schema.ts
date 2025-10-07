@@ -473,7 +473,7 @@ export const template_stages = pgTable("template_stages", {
   name: text("name").notNull(),
   description: text("description"),
   duration_days: integer("duration_days"),
-  assignee_role: text("assignee_role"),
+  assignee_id: varchar("assignee_id").references(() => users.id),
   cost: numeric("cost", { precision: 12, scale: 2 }),
   order: integer("order").notNull(),
   created_at: timestamp("created_at").defaultNow().notNull(),

@@ -13,7 +13,6 @@ export interface LocalStage {
   name: string;
   order_index: number;
   duration_days?: number;
-  assignee_role?: string;
   assignee_id?: string;
   cost?: number;
   description?: string;
@@ -212,37 +211,24 @@ export function LocalStageEditor({
                         data-testid={`input-cost-${index}`}
                       />
                     </div>
-                    {mode === 'template' ? (
-                      <div className="col-span-2">
-                        <Label className="text-xs">Роль исполнителя</Label>
-                        <Input
-                          value={stage.assignee_role || ''}
-                          onChange={(e) => handleUpdateStage(stage.id, 'assignee_role', e.target.value)}
-                          placeholder="Например: Столяр"
-                          className="h-8"
-                          data-testid={`input-assignee-role-${index}`}
-                        />
-                      </div>
-                    ) : (
-                      <div className="col-span-2">
-                        <Label className="text-xs">Исполнитель</Label>
-                        <Select
-                          value={stage.assignee_id || ''}
-                          onValueChange={(value) => handleUpdateStage(stage.id, 'assignee_id', value)}
-                        >
-                          <SelectTrigger className="h-8" data-testid={`select-assignee-${index}`}>
-                            <SelectValue placeholder="Выбрать исполнителя" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {users.map(u => (
-                              <SelectItem key={u.id} value={u.id}>
-                                {u.full_name || u.username}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
+                    <div className="col-span-2">
+                      <Label className="text-xs">Исполнитель</Label>
+                      <Select
+                        value={stage.assignee_id || ''}
+                        onValueChange={(value) => handleUpdateStage(stage.id, 'assignee_id', value)}
+                      >
+                        <SelectTrigger className="h-8" data-testid={`select-assignee-${index}`}>
+                          <SelectValue placeholder="Выбрать исполнителя" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {users.map(u => (
+                            <SelectItem key={u.id} value={u.id}>
+                              {u.full_name || u.username}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                     <div className="col-span-2">
                       <Label className="text-xs">Описание</Label>
                       <Textarea
