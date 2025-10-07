@@ -12,6 +12,7 @@ import { router as tasksRouter } from "./modules/tasks/routes";
 import { router as documentsRouter } from "./modules/documents/routes";
 import { router as usersRouter } from "./modules/users/routes";
 import { router as settingsRouter } from "./modules/settings/routes";
+import { router as attachmentsRouter } from "./modules/attachments/routes";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Register all modular routes (они уже содержат префикс /api)
@@ -25,6 +26,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(documentsRouter);
   app.use(usersRouter);
   app.use(settingsRouter);
+  app.use(attachmentsRouter);
 
   const httpServer = createServer(app);
 

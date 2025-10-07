@@ -10,3 +10,4 @@ export { tasksRepository } from "./modules/tasks/repository";
 export { documentsRepository } from "./modules/documents/repository";
 export { usersRepository } from "./modules/users/repository";
 export { settingsRepository } from "./modules/settings/repository";
+export { attachmentsRepository } from "./modules/attachments/repository";

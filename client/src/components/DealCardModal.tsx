@@ -13,7 +13,10 @@ import { apiRequest, queryClient, getCurrentUserId } from "@/lib/queryClient";
 import { DocumentFormDialog } from "@/components/DocumentFormDialog";
 import { DeleteDealDialog } from "@/components/DeleteDealDialog";
 import { useToast } from "@/hooks/use-toast";
-import type { Deal, DealMessage, InsertDealMessage, DealDocument, User, DealStage } from "@shared/schema";
+import type { Deal, DealMessage, InsertDealMessage, DealDocument, User, DealStage, DealAttachment } from "@shared/schema";
+import { ObjectUploader } from "@/components/ObjectUploader";
+import type { UploadResult } from "@uppy/core";
+import { X, Download } from "lucide-react";
 
 interface DealCardModalProps {
   dealId: string | null;
@@ -40,6 +43,11 @@ export function DealCardModal({ dealId, open, onOpenChange }: DealCardModalProps
   const { data: stages = [] } = useQuery<DealStage[]>({
     queryKey: ['/api/deal-stages'],
     enabled: open,
+  });
+
+  const { data: attachments = [] } = useQuery<DealAttachment[]>({
+    queryKey: ['/api/deals', dealId, 'attachments'],
+    enabled: !!dealId && open,
   });
 
   const [messageText, setMessageText] = useState("");
@@ -122,6 +130,68 @@ export function DealCardModal({ dealId, open, onOpenChange }: DealCardModalProps
       });
     },
   });
+
+  const deleteAttachment = useMutation({
+    mutationFn: async (attachmentId: string) => {
+      return await apiRequest('DELETE', `/api/deals/${dealId}/attachments/${attachmentId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/deals', dealId, 'attachments'] });
+      toast({
+        title: "Файл удалён",
+        description: "Файл успешно удалён",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Ошибка",
+        description: error.message || "Не удалось удалить файл",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const [uploadParametersMap, setUploadParametersMap] = useState<Record<string, string>>({});
+
+  const handleGetUploadParameters = async () => {
+    const response: any = await apiRequest('POST', '/api/objects/upload', {});
+    // Store objectPath for later use, keyed by uploadURL
+    setUploadParametersMap(prev => ({
+      ...prev,
+      [response.uploadURL]: response.objectPath
+    }));
+    return {
+      method: 'PUT' as const,
+      url: response.uploadURL,
+    };
+  };
+
+  const handleUploadComplete = async (result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
+    if (!result.successful || result.successful.length === 0) return;
+
+    for (const file of result.successful) {
+      const uploadURL = (file as any).uploadURL;
+      const objectPath = uploadParametersMap[uploadURL];
+      
+      await apiRequest('POST', `/api/deals/${dealId}/attachments`, {
+        deal_id: dealId,
+        file_name: file.name,
+        file_path: objectPath || uploadURL,
+        file_size: file.size || 0,
+        mime_type: file.type || 'application/octet-stream',
+        uploaded_by: getCurrentUserId(),
+      });
+    }
+
+    // Clear upload parameters map
+    setUploadParametersMap({});
+    
+    queryClient.invalidateQueries({ queryKey: ['/api/deals', dealId, 'attachments'] });
+    toast({
+      title: "Файлы загружены",
+      description: `Загружено ${result.successful.length} файл(ов)`,
+    });
+  };
 
   const handleSendMessage = () => {
     if (!messageText.trim()) return;
@@ -231,11 +301,60 @@ export function DealCardModal({ dealId, open, onOpenChange }: DealCardModalProps
 
                   {/* Документы */}
                   <div className="mb-4">
-                    <p className="text-sm font-medium mb-2">Документы</p>
-                    <p className="text-sm text-muted-foreground mb-2">Пусто</p>
-                    <Button size="sm" variant="outline" disabled data-testid="button-add-document">
-                      + Добавить документ
-                    </Button>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-sm font-medium">Документы</p>
+                      <ObjectUploader
+                        maxNumberOfFiles={10}
+                        maxFileSize={52428800}
+                        onGetUploadParameters={handleGetUploadParameters}
+                        onComplete={handleUploadComplete}
+                        buttonClassName="h-7"
+                      >
+                        <Plus className="h-3 w-3 mr-1" />
+                        <span className="text-xs">Загрузить</span>
+                      </ObjectUploader>
+                    </div>
+                    {attachments.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">Нет файлов</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {attachments.map((attachment) => (
+                          <div
+                            key={attachment.id}
+                            className="flex items-center justify-between p-2 bg-muted/50 rounded text-xs hover-elevate"
+                            data-testid={`attachment-${attachment.id}`}
+                          >
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium truncate">{attachment.file_name}</p>
+                              <p className="text-muted-foreground">
+                                {attachment.file_size ? `${(attachment.file_size / 1024).toFixed(1)} KB` : 'N/A'}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-1 ml-2">
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-6 w-6"
+                                onClick={() => window.open(attachment.file_path, '_blank')}
+                                data-testid={`button-download-${attachment.id}`}
+                              >
+                                <Download className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-6 w-6 text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                                onClick={() => deleteAttachment.mutate(attachment.id)}
+                                disabled={deleteAttachment.isPending}
+                                data-testid={`button-delete-${attachment.id}`}
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   <Separator className="my-4" />

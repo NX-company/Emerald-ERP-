@@ -351,6 +351,25 @@ export const insertDealDocumentSchema = createInsertSchema(deal_documents).omit(
 export type InsertDealDocument = z.infer<typeof insertDealDocumentSchema>;
 export type DealDocument = typeof deal_documents.$inferSelect;
 
+export const deal_attachments = pgTable("deal_attachments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  deal_id: varchar("deal_id").references(() => deals.id, { onDelete: "cascade" }).notNull(),
+  file_name: text("file_name").notNull(),
+  file_path: text("file_path").notNull(),
+  file_size: integer("file_size"),
+  mime_type: text("mime_type"),
+  uploaded_by: varchar("uploaded_by").references(() => users.id),
+  created_at: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertDealAttachmentSchema = createInsertSchema(deal_attachments).omit({
+  id: true,
+  created_at: true,
+});
+
+export type InsertDealAttachment = z.infer<typeof insertDealAttachmentSchema>;
+export type DealAttachment = typeof deal_attachments.$inferSelect;
+
 export const custom_field_definitions = pgTable("custom_field_definitions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
