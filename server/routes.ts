@@ -13,6 +13,7 @@ import { router as documentsRouter } from "./modules/documents/routes";
 import { router as usersRouter } from "./modules/users/routes";
 import { router as settingsRouter } from "./modules/settings/routes";
 import { router as attachmentsRouter } from "./modules/attachments/routes";
+import { router as customFieldsRouter } from "./modules/custom-fields/routes";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Register all modular routes (они уже содержат префикс /api)
@@ -27,6 +28,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(usersRouter);
   app.use(settingsRouter);
   app.use(attachmentsRouter);
+  app.use(customFieldsRouter);
 
   const httpServer = createServer(app);
 

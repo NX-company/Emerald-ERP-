@@ -15,6 +15,7 @@ import { DeleteDealDialog } from "@/components/DeleteDealDialog";
 import { useToast } from "@/hooks/use-toast";
 import type { Deal, DealMessage, InsertDealMessage, DealDocument, User, DealStage, DealAttachment } from "@shared/schema";
 import { ObjectUploader } from "@/components/ObjectUploader";
+import { DealCustomFields } from "@/components/DealCustomFields";
 import type { UploadResult } from "@uppy/core";
 import { X, Download } from "lucide-react";
 
@@ -359,11 +360,8 @@ export function DealCardModal({ dealId, open, onOpenChange }: DealCardModalProps
 
                   <Separator className="my-4" />
 
-                  {/* Доп поля */}
-                  <div>
-                    <p className="text-sm font-medium mb-2">Дополнительные поля</p>
-                    <p className="text-sm text-muted-foreground">Настройте поля в настройках</p>
-                  </div>
+                  {/* Пользовательские поля */}
+                  <DealCustomFields dealId={dealId} />
                 </>
               )}
             </div>

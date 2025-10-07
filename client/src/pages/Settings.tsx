@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { UserAvatar } from "@/components/UserAvatar";
+import { ManageCustomFields } from "@/components/ManageCustomFields";
 import { Plus, Trash2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -58,6 +59,7 @@ export default function Settings() {
         <TabsList className="overflow-x-auto">
           <TabsTrigger value="users">Пользователи</TabsTrigger>
           <TabsTrigger value="company">Компания</TabsTrigger>
+          <TabsTrigger value="custom-fields">Поля сделок</TabsTrigger>
           <TabsTrigger value="integrations">Интеграции</TabsTrigger>
         </TabsList>
 
@@ -184,6 +186,10 @@ export default function Settings() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="custom-fields" className="mt-6">
+          <ManageCustomFields />
         </TabsContent>
 
         <TabsContent value="integrations" className="mt-6 space-y-6">
