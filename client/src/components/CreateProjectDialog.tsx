@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
@@ -12,8 +13,17 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Edit2, Plus, Trash2, Settings2, ArrowLeft } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Loader2, Edit2, Plus, Trash2, Settings2, ArrowLeft, Wand2 } from "lucide-react";
 import { LocalStageEditor, LocalStage, LocalStageDependency } from "./LocalStageEditor";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 interface InvoicePosition {
   name: string;
@@ -48,12 +58,21 @@ export function CreateProjectDialog({
   isPending,
   dealName,
 }: CreateProjectDialogProps) {
+  const { toast } = useToast();
   const [positions, setPositions] = useState<InvoicePosition[]>([]);
   const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [currentTab, setCurrentTab] = useState<"positions" | "stages">("positions");
   const [selectedPositionForStages, setSelectedPositionForStages] = useState<number | null>(null);
   const [positionStagesData, setPositionStagesData] = useState<Record<number, PositionStagesData>>({});
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
+  const [isApplyingTemplate, setIsApplyingTemplate] = useState(false);
+
+  // Load templates
+  const { data: templates = [] } = useQuery<any[]>({
+    queryKey: ["/api/templates"],
+    enabled: open,
+  });
 
   useEffect(() => {
     if (open && invoicePositions.length > 0) {
@@ -140,6 +159,73 @@ export function CreateProjectDialog({
   const backToPositions = () => {
     setSelectedPositionForStages(null);
     setCurrentTab("positions");
+  };
+
+  const handleApplyTemplate = async () => {
+    if (!selectedTemplateId || selectedPositionForStages === null) return;
+
+    setIsApplyingTemplate(true);
+    try {
+      const response = await apiRequest(
+        "GET",
+        `/api/templates/${selectedTemplateId}`
+      );
+      const data: any = await response.json();
+
+      // API returns { template, stages, dependencies }
+      if (!data || !data.stages || !Array.isArray(data.stages)) {
+        throw new Error("Invalid template data structure");
+      }
+
+      const { template, stages, dependencies = [] } = data;
+
+      // Create stage ID mapping with crypto.randomUUID() for uniqueness
+      const stageIdMap: Record<string, string> = {};
+      stages.forEach((stage: any) => {
+        stageIdMap[stage.id] = crypto.randomUUID();
+      });
+
+      // Map template stages to LocalStage format
+      const localStages: LocalStage[] = stages.map((stage: any) => ({
+        id: stageIdMap[stage.id],
+        name: stage.name,
+        description: stage.description || "",
+        duration_days: stage.duration_days || 0,
+        order_index: stage.order,
+      }));
+
+      // Map dependencies with validation - skip invalid dependencies
+      const localDependencies: LocalStageDependency[] = dependencies
+        .filter((dep: any) => {
+          const hasValidIds = stageIdMap[dep.template_stage_id] && stageIdMap[dep.depends_on_template_stage_id];
+          if (!hasValidIds) {
+            console.warn("Skipping dependency with missing stage IDs:", dep);
+          }
+          return hasValidIds;
+        })
+        .map((dep: any) => ({
+          id: crypto.randomUUID(),
+          stage_id: stageIdMap[dep.template_stage_id],
+          depends_on_stage_id: stageIdMap[dep.depends_on_template_stage_id],
+        }));
+
+      setPositionStagesData(prev => ({
+        ...prev,
+        [selectedPositionForStages]: {
+          stages: localStages,
+          dependencies: localDependencies,
+        }
+      }));
+
+      toast({ description: `Шаблон "${template.name}" применён` });
+      setSelectedTemplateId("");
+    } catch (error) {
+      console.error("Error applying template:", error);
+      const message = error instanceof Error ? error.message : "Ошибка при применении шаблона";
+      toast({ description: message, variant: "destructive" });
+    } finally {
+      setIsApplyingTemplate(false);
+    }
   };
 
   return (
@@ -331,29 +417,63 @@ export function CreateProjectDialog({
           )}
             </>
           ) : selectedPositionForStages !== null ? (
-            <LocalStageEditor
-              positionName={positions[selectedPositionForStages]?.name || ""}
-              stages={positionStagesData[selectedPositionForStages]?.stages || []}
-              dependencies={positionStagesData[selectedPositionForStages]?.dependencies || []}
-              onStagesChange={(stages) => {
-                setPositionStagesData(prev => ({
-                  ...prev,
-                  [selectedPositionForStages]: {
-                    stages,
-                    dependencies: prev[selectedPositionForStages]?.dependencies || []
-                  }
-                }));
-              }}
-              onDependenciesChange={(dependencies) => {
-                setPositionStagesData(prev => ({
-                  ...prev,
-                  [selectedPositionForStages]: {
-                    stages: prev[selectedPositionForStages]?.stages || [],
-                    dependencies
-                  }
-                }));
-              }}
-            />
+            <>
+              <div className="shrink-0 flex items-center gap-2 pb-3 border-b">
+                <Select
+                  value={selectedTemplateId}
+                  onValueChange={setSelectedTemplateId}
+                  disabled={isApplyingTemplate}
+                >
+                  <SelectTrigger className="flex-1" data-testid="select-template">
+                    <SelectValue placeholder="Выберите шаблон процесса" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {templates.map((template) => (
+                      <SelectItem key={template.id} value={template.id}>
+                        {template.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  onClick={handleApplyTemplate}
+                  disabled={!selectedTemplateId || isApplyingTemplate}
+                  size="default"
+                  data-testid="button-apply-template"
+                >
+                  {isApplyingTemplate ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Wand2 className="w-4 h-4 mr-2" />
+                  )}
+                  Применить
+                </Button>
+              </div>
+
+              <LocalStageEditor
+                positionName={positions[selectedPositionForStages]?.name || ""}
+                stages={positionStagesData[selectedPositionForStages]?.stages || []}
+                dependencies={positionStagesData[selectedPositionForStages]?.dependencies || []}
+                onStagesChange={(stages) => {
+                  setPositionStagesData(prev => ({
+                    ...prev,
+                    [selectedPositionForStages]: {
+                      stages,
+                      dependencies: prev[selectedPositionForStages]?.dependencies || []
+                    }
+                  }));
+                }}
+                onDependenciesChange={(dependencies) => {
+                  setPositionStagesData(prev => ({
+                    ...prev,
+                    [selectedPositionForStages]: {
+                      stages: prev[selectedPositionForStages]?.stages || [],
+                      dependencies
+                    }
+                  }));
+                }}
+              />
+            </>
           ) : null}
 
           <DialogFooter className="shrink-0">
