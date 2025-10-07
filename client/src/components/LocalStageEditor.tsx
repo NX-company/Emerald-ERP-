@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Trash2, Link2, X } from "lucide-react";
+import { Plus, Trash2, Link2, X, ChevronUp, ChevronDown } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
@@ -100,6 +100,22 @@ export function LocalStageEditor({
     return dependencies.filter(d => d.stage_id === stageId);
   };
 
+  const handleMoveUp = (index: number) => {
+    if (index === 0) return;
+    const newStages = [...stages];
+    [newStages[index - 1], newStages[index]] = [newStages[index], newStages[index - 1]];
+    const reindexed = newStages.map((s, i) => ({ ...s, order_index: i }));
+    onStagesChange(reindexed);
+  };
+
+  const handleMoveDown = (index: number) => {
+    if (index === stages.length - 1) return;
+    const newStages = [...stages];
+    [newStages[index], newStages[index + 1]] = [newStages[index + 1], newStages[index]];
+    const reindexed = newStages.map((s, i) => ({ ...s, order_index: i }));
+    onStagesChange(reindexed);
+  };
+
   return (
     <div className="flex flex-col gap-3 min-h-0">
       <div className="shrink-0">
@@ -127,6 +143,30 @@ export function LocalStageEditor({
                   data-testid={`stage-item-${index}`}
                 >
                   <div className="flex items-center gap-2">
+                    <div className="flex flex-col gap-1">
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => handleMoveUp(index)}
+                        disabled={index === 0}
+                        className="h-6 w-6"
+                        data-testid={`button-move-up-${index}`}
+                      >
+                        <ChevronUp className="w-3 h-3" />
+                      </Button>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => handleMoveDown(index)}
+                        disabled={index === stages.length - 1}
+                        className="h-6 w-6"
+                        data-testid={`button-move-down-${index}`}
+                      >
+                        <ChevronDown className="w-3 h-3" />
+                      </Button>
+                    </div>
                     <div className="flex-1">
                       <Input
                         value={stage.name}
