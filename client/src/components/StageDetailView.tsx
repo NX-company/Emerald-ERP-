@@ -36,6 +36,7 @@ export function StageDetailView({
   const [newMessage, setNewMessage] = useState("");
   const [uploadingFile, setUploadingFile] = useState(false);
   const [currentStatus, setCurrentStatus] = useState(stageStatus || "pending");
+  const [isDragging, setIsDragging] = useState(false);
   
   const userStr = localStorage.getItem("user");
   const user = userStr ? JSON.parse(userStr) : null;
@@ -99,28 +100,52 @@ export function StageDetailView({
     createMessageMutation.mutate(newMessage);
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  const uploadFiles = async (files: FileList) => {
     setUploadingFile(true);
     try {
-      // For now, just create a document record without actual file upload
-      await apiRequest("POST", "/api/documents", {
-        name: file.name,
-        type: "stage_file",
-        file_url: "", // Will be updated when Object Storage is integrated
-        project_stage_id: stageId,
-      });
+      const uploadPromises = Array.from(files).map(file =>
+        apiRequest("POST", "/api/documents", {
+          name: file.name,
+          type: "other",
+          file_path: "",
+          project_stage_id: stageId,
+        })
+      );
       
+      await Promise.all(uploadPromises);
       queryClient.invalidateQueries({ queryKey: ["/api/stages", stageId, "documents"] });
-      toast({ description: "Файл добавлен" });
+      toast({ description: `Загружено файлов: ${files.length}` });
     } catch (error) {
-      toast({ description: "Ошибка загрузки файла", variant: "destructive" });
+      toast({ description: "Ошибка загрузки файлов", variant: "destructive" });
     } finally {
       setUploadingFile(false);
-      e.target.value = "";
     }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    await uploadFiles(files);
+    e.target.value = "";
+  };
+
+  const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      await uploadFiles(files);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
   };
 
   return (
@@ -188,14 +213,23 @@ export function StageDetailView({
               ))}
             </div>
           )}
-          <div className="relative">
+          <div 
+            className={`relative border-2 border-dashed rounded-lg p-4 transition-colors ${isDragging ? 'border-primary bg-primary/5' : 'border-muted-foreground/25'}`}
+            onDrop={handleDrop}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+          >
             <Input
               type="file"
+              multiple
               onChange={handleFileUpload}
               disabled={uploadingFile}
               className="cursor-pointer"
               data-testid="input-file-upload"
             />
+            <p className="text-xs text-muted-foreground text-center mt-2">
+              {uploadingFile ? "Загрузка..." : "Перетащите файлы или выберите"}
+            </p>
           </div>
         </CardContent>
       </Card>
