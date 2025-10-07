@@ -39,10 +39,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { X, Plus, Loader2, Trash2 } from "lucide-react";
-import { insertProjectSchema, type Project, type User, type Deal, type ProjectStage } from "@shared/schema";
+import { X, Plus, Loader2, Trash2, Lock, CheckCircle2 } from "lucide-react";
+import { insertProjectSchema, type Project, type User, type Deal, type ProjectStage, type ProjectItem, type StageDependency } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface ProjectDetailSheetProps {
   project: Project | null;
@@ -65,6 +66,16 @@ export function ProjectDetailSheet({ project, open, onOpenChange }: ProjectDetai
 
   const { data: stages = [], isLoading: stagesLoading } = useQuery<ProjectStage[]>({
     queryKey: ["/api/projects", project?.id, "stages"],
+    enabled: !!project?.id,
+  });
+
+  const { data: items = [], isLoading: itemsLoading } = useQuery<ProjectItem[]>({
+    queryKey: ["/api/projects", project?.id, "items"],
+    enabled: !!project?.id,
+  });
+
+  const { data: dependencies = [], isLoading: dependenciesLoading } = useQuery<StageDependency[]>({
+    queryKey: ["/api/projects", project?.id, "dependencies"],
     enabled: !!project?.id,
   });
 
@@ -94,6 +105,32 @@ export function ProjectDetailSheet({ project, open, onOpenChange }: ProjectDetai
       });
     }
   }, [project, form]);
+
+  // Функции для работы с зависимостями
+  const getStageDependencies = (stageId: string): StageDependency[] => {
+    return dependencies.filter(dep => dep.stage_id === stageId);
+  };
+
+  const getIncompleteRequiredStages = (stageId: string): ProjectStage[] => {
+    const currentStage = stages.find(s => s.id === stageId);
+    if (!currentStage) return [];
+
+    const stageDeps = getStageDependencies(stageId);
+    
+    // Фильтруем только зависимости в пределах одной позиции
+    return stageDeps
+      .map(dep => stages.find(s => s.id === dep.depends_on_stage_id))
+      .filter((s): s is ProjectStage => 
+        !!s && 
+        s.item_id === currentStage.item_id && 
+        s.status !== "completed"
+      );
+  };
+
+  const canStartStage = (stageId: string): boolean => {
+    const incompleteStages = getIncompleteRequiredStages(stageId);
+    return incompleteStages.length === 0;
+  };
 
   const updateMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -173,6 +210,14 @@ export function ProjectDetailSheet({ project, open, onOpenChange }: ProjectDetai
 
   const updateStageMutation = useMutation({
     mutationFn: async ({ stageId, status }: { stageId: string; status: string }) => {
+      // Проверяем зависимости перед изменением статуса на "in_progress" или "completed"
+      if (status !== "pending") {
+        const incompleteStages = getIncompleteRequiredStages(stageId);
+        if (incompleteStages.length > 0) {
+          const stageNames = incompleteStages.map(s => s.name).join(", ");
+          throw new Error(`Нельзя запустить этап. Сначала завершите: ${stageNames}`);
+        }
+      }
       await apiRequest("PUT", `/api/projects/stages/${stageId}`, { status });
     },
     onSuccess: () => {
@@ -435,91 +480,134 @@ export function ProjectDetailSheet({ project, open, onOpenChange }: ProjectDetai
 
           <Card className="mt-6">
             <CardHeader>
-              <CardTitle className="text-base">Стадии проекта</CardTitle>
+              <CardTitle className="text-base">Позиции и этапы</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex gap-2">
-                <Input
-                  value={newStageName}
-                  onChange={(e) => setNewStageName(e.target.value)}
-                  placeholder="Название стадии"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      handleAddStage();
-                    }
-                  }}
-                  data-testid="input-new-stage-name"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  onClick={handleAddStage}
-                  disabled={addStageMutation.isPending || !newStageName.trim()}
-                  data-testid="button-add-stage"
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
-
-              {stagesLoading ? (
-                <div className="text-sm text-muted-foreground" data-testid="text-stages-loading">
-                  Загрузка стадий...
+            <CardContent className="space-y-4">
+              {itemsLoading || stagesLoading || dependenciesLoading ? (
+                <div className="text-sm text-muted-foreground" data-testid="text-loading">
+                  Загрузка...
                 </div>
-              ) : stages.length === 0 ? (
-                <div className="text-sm text-muted-foreground" data-testid="text-no-stages">
-                  Нет стадий
+              ) : items.length === 0 ? (
+                <div className="text-sm text-muted-foreground" data-testid="text-no-items">
+                  Нет позиций в проекте
                 </div>
               ) : (
-                <div className="space-y-2">
-                  {stages
-                    .sort((a, b) => a.order - b.order)
-                    .map((stage, index) => (
-                      <div 
-                        key={stage.id} 
-                        className="flex items-center gap-2 p-2 border rounded-md"
-                        data-testid={`stage-item-${index}`}
-                      >
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium text-sm truncate" data-testid={`stage-name-${index}`}>
-                            {stage.name}
+                <div className="space-y-4">
+                  {items.map((item, itemIndex) => {
+                    const itemStages = stages.filter(s => s.item_id === item.id).sort((a, b) => a.order - b.order);
+                    
+                    return (
+                      <div key={item.id} className="border rounded-lg p-3" data-testid={`item-${itemIndex}`}>
+                        <div className="flex gap-4">
+                          {/* Позиция слева */}
+                          <div className="flex-1 min-w-0 space-y-1">
+                            <h4 className="font-medium text-sm" data-testid={`item-name-${itemIndex}`}>
+                              {item.name}
+                            </h4>
+                            {item.article && (
+                              <p className="text-xs text-muted-foreground" data-testid={`item-article-${itemIndex}`}>
+                                Артикул: {item.article}
+                              </p>
+                            )}
+                            <div className="flex gap-3 text-xs text-muted-foreground">
+                              <span data-testid={`item-quantity-${itemIndex}`}>{item.quantity} шт.</span>
+                              {item.price && (
+                                <span data-testid={`item-price-${itemIndex}`}>
+                                  {parseFloat(item.price).toLocaleString('ru-RU')} ₽
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Этапы справа */}
+                          <div className="flex-1 space-y-2">
+                            {itemStages.length === 0 ? (
+                              <p className="text-xs text-muted-foreground" data-testid={`item-no-stages-${itemIndex}`}>
+                                Нет этапов
+                              </p>
+                            ) : (
+                              itemStages.map((stage, stageIndex) => {
+                                const stageDeps = getStageDependencies(stage.id);
+                                const incompleteStages = getIncompleteRequiredStages(stage.id);
+                                const isBlocked = incompleteStages.length > 0 && stage.status === "pending";
+
+                                return (
+                                  <div 
+                                    key={stage.id} 
+                                    className="space-y-1"
+                                    data-testid={`stage-${itemIndex}-${stageIndex}`}
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      {/* Индикатор статуса */}
+                                      {stage.status === "completed" ? (
+                                        <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />
+                                      ) : isBlocked ? (
+                                        <TooltipProvider>
+                                          <Tooltip>
+                                            <TooltipTrigger>
+                                              <Lock className="w-4 h-4 text-muted-foreground shrink-0" />
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                              <p className="text-xs">
+                                                Сначала завершите: {incompleteStages.map(s => s.name).join(", ")}
+                                              </p>
+                                            </TooltipContent>
+                                          </Tooltip>
+                                        </TooltipProvider>
+                                      ) : (
+                                        <div className="w-4 h-4 shrink-0" />
+                                      )}
+
+                                      <div className="flex-1 min-w-0">
+                                        <span className="text-sm font-medium truncate" data-testid={`stage-name-${itemIndex}-${stageIndex}`}>
+                                          {stage.name}
+                                        </span>
+                                      </div>
+
+                                      <Select 
+                                        value={stage.status} 
+                                        onValueChange={(value) => updateStageMutation.mutate({ 
+                                          stageId: stage.id, 
+                                          status: value 
+                                        })}
+                                        disabled={isBlocked}
+                                      >
+                                        <SelectTrigger className="w-32 h-8 text-xs" data-testid={`select-stage-status-${itemIndex}-${stageIndex}`}>
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="pending">
+                                            {statusLabels.pending}
+                                          </SelectItem>
+                                          <SelectItem value="in_progress">
+                                            {statusLabels.in_progress}
+                                          </SelectItem>
+                                          <SelectItem value="completed">
+                                            {statusLabels.completed}
+                                          </SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+
+                                    {/* Зависимости */}
+                                    {stageDeps.length > 0 && (
+                                      <div className="ml-6 text-xs text-muted-foreground" data-testid={`stage-deps-${itemIndex}-${stageIndex}`}>
+                                        Зависит от:{" "}
+                                        {stageDeps.map(dep => {
+                                          const depStage = stages.find(s => s.id === dep.depends_on_stage_id);
+                                          return depStage?.name;
+                                        }).filter(Boolean).join(", ")}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })
+                            )}
                           </div>
                         </div>
-                        <Select 
-                          value={stage.status} 
-                          onValueChange={(value) => updateStageMutation.mutate({ 
-                            stageId: stage.id, 
-                            status: value 
-                          })}
-                        >
-                          <SelectTrigger className="w-36" data-testid={`select-stage-status-${index}`}>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="pending" data-testid={`option-stage-status-pending-${index}`}>
-                              {statusLabels.pending}
-                            </SelectItem>
-                            <SelectItem value="in_progress" data-testid={`option-stage-status-in_progress-${index}`}>
-                              {statusLabels.in_progress}
-                            </SelectItem>
-                            <SelectItem value="completed" data-testid={`option-stage-status-completed-${index}`}>
-                              {statusLabels.completed}
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => deleteStageMutation.mutate(stage.id)}
-                          disabled={deleteStageMutation.isPending}
-                          data-testid={`button-delete-stage-${index}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
                       </div>
-                    ))}
+                    );
+                  })}
                 </div>
               )}
             </CardContent>
