@@ -61,6 +61,7 @@ export function CreateProjectDialog({
       setSelectedIndices(new Set(invoicePositions.map((_, i) => i)));
       setCurrentTab("positions");
       setSelectedPositionForStages(null);
+      setPositionStagesData({}); // Очистить данные этапов при открытии диалога
     }
   }, [open, invoicePositions]);
 
@@ -106,6 +107,19 @@ export function CreateProjectDialog({
       }
     });
     setSelectedIndices(newSelected);
+
+    // Переиндексировать positionStagesData
+    const newStagesData: Record<number, PositionStagesData> = {};
+    Object.entries(positionStagesData).forEach(([key, value]) => {
+      const oldIndex = parseInt(key);
+      if (oldIndex < index) {
+        newStagesData[oldIndex] = value;
+      } else if (oldIndex > index) {
+        newStagesData[oldIndex - 1] = value;
+      }
+      // Если oldIndex === index, не добавляем (удаляем)
+    });
+    setPositionStagesData(newStagesData);
   };
 
   const handleUpdatePosition = (index: number, field: keyof InvoicePosition, value: string | number) => {
