@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Calendar, DollarSign, Send, Paperclip, FileText, Download } from "lucide-react";
@@ -17,6 +18,8 @@ interface StageDetailViewProps {
   stageDescription?: string;
   stageDeadline?: string;
   stageCost?: string;
+  projectId?: string;
+  onStatusChange?: () => void;
 }
 
 export function StageDetailView({ 
@@ -25,11 +28,14 @@ export function StageDetailView({
   stageStatus,
   stageDescription,
   stageDeadline,
-  stageCost
+  stageCost,
+  projectId,
+  onStatusChange
 }: StageDetailViewProps) {
   const { toast } = useToast();
   const [newMessage, setNewMessage] = useState("");
   const [uploadingFile, setUploadingFile] = useState(false);
+  const [currentStatus, setCurrentStatus] = useState(stageStatus || "pending");
   
   const userStr = localStorage.getItem("user");
   const user = userStr ? JSON.parse(userStr) : null;
@@ -46,10 +52,13 @@ export function StageDetailView({
 
   const createMessageMutation = useMutation({
     mutationFn: async (message: string) => {
+      if (!user?.id) {
+        throw new Error("User not authenticated");
+      }
       const response = await apiRequest(
         "POST",
         `/api/stages/${stageId}/messages`,
-        { message, user_id: user?.id }
+        { message, user_id: user.id }
       );
       return response.json();
     },
@@ -58,13 +67,35 @@ export function StageDetailView({
       setNewMessage("");
       toast({ description: "Сообщение добавлено" });
     },
-    onError: () => {
-      toast({ description: "Ошибка отправки", variant: "destructive" });
+    onError: (error: Error) => {
+      toast({ description: error.message || "Ошибка отправки", variant: "destructive" });
     },
   });
 
+  const updateStatusMutation = useMutation({
+    mutationFn: async (status: string) => {
+      await apiRequest("PUT", `/api/projects/stages/${stageId}`, { status });
+    },
+    onSuccess: () => {
+      if (projectId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "stages"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
+      }
+      onStatusChange?.();
+      toast({ description: "Статус обновлен" });
+    },
+    onError: (error: Error) => {
+      toast({ description: error.message || "Ошибка обновления статуса", variant: "destructive" });
+    },
+  });
+
+  const handleStatusChange = (status: string) => {
+    setCurrentStatus(status);
+    updateStatusMutation.mutate(status);
+  };
+
   const handleSendMessage = () => {
-    if (!newMessage.trim()) return;
+    if (!newMessage.trim() || !user?.id) return;
     createMessageMutation.mutate(newMessage);
   };
 
@@ -96,18 +127,23 @@ export function StageDetailView({
     <div className="space-y-4">
       <Card>
         <CardHeader>
-          <div className="flex items-start justify-between">
-            <div>
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1">
               <CardTitle>{stageName}</CardTitle>
               {stageDescription && (
                 <p className="text-sm text-muted-foreground mt-2">{stageDescription}</p>
               )}
             </div>
-            {stageStatus && (
-              <Badge variant={stageStatus === 'completed' ? 'default' : stageStatus === 'in_progress' ? 'secondary' : 'outline'}>
-                {stageStatus === 'completed' ? 'Завершён' : stageStatus === 'in_progress' ? 'В работе' : 'Ожидает'}
-              </Badge>
-            )}
+            <Select value={currentStatus} onValueChange={handleStatusChange}>
+              <SelectTrigger className="w-40" data-testid="select-stage-status">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="pending">Ожидает</SelectItem>
+                <SelectItem value="in_progress">В работе</SelectItem>
+                <SelectItem value="completed">Завершён</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </CardHeader>
         <CardContent>

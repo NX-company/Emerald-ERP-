@@ -39,7 +39,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { X, Plus, Loader2, Trash2, Lock, CheckCircle2 } from "lucide-react";
+import { X, Plus, Loader2, Trash2, Lock, CheckCircle2, FileText } from "lucide-react";
 import { insertProjectSchema, type Project, type User, type Deal, type ProjectStage, type ProjectItem, type StageDependency } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -57,6 +57,7 @@ export function ProjectDetailSheet({ project, open, onOpenChange }: ProjectDetai
   const [newStageName, setNewStageName] = useState("");
   const [selectedStage, setSelectedStage] = useState<ProjectStage | null>(null);
   const [stageDetailOpen, setStageDetailOpen] = useState(false);
+  const [documentsDialogOpen, setDocumentsDialogOpen] = useState(false);
   const { toast } = useToast();
 
   const { data: users = [] } = useQuery<User[]>({
@@ -80,6 +81,11 @@ export function ProjectDetailSheet({ project, open, onOpenChange }: ProjectDetai
   const { data: dependencies = [], isLoading: dependenciesLoading } = useQuery<StageDependency[]>({
     queryKey: ["/api/projects", project?.id, "dependencies"],
     enabled: !!project?.id,
+  });
+
+  const { data: allDocuments = [] } = useQuery<any[]>({
+    queryKey: ["/api/projects", project?.id, "documents"],
+    enabled: !!project?.id && documentsDialogOpen,
   });
 
   const form = useForm({
@@ -482,8 +488,17 @@ export function ProjectDetailSheet({ project, open, onOpenChange }: ProjectDetai
           </Form>
 
           <Card className="mt-6">
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-base">Позиции и этапы</CardTitle>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setDocumentsDialogOpen(true)}
+                data-testid="button-project-documents"
+              >
+                <FileText className="w-4 h-4 mr-2" />
+                Документы
+              </Button>
             </CardHeader>
             <CardContent className="space-y-4">
               {itemsLoading || stagesLoading || dependenciesLoading ? (
@@ -667,9 +682,55 @@ export function ProjectDetailSheet({ project, open, onOpenChange }: ProjectDetai
                 stageDescription={selectedStage.description || undefined}
                 stageDeadline={selectedStage.end_date ? new Date(selectedStage.end_date).toISOString() : undefined}
                 stageCost={selectedStage.cost || undefined}
+                projectId={project?.id}
+                onStatusChange={() => {
+                  queryClient.invalidateQueries({ queryKey: ["/api/projects", project?.id, "stages"] });
+                  queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
+                }}
               />
             </div>
           )}
+        </SheetContent>
+      </Sheet>
+
+      <Sheet open={documentsDialogOpen} onOpenChange={setDocumentsDialogOpen}>
+        <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Документы проекта</SheetTitle>
+            <SheetDescription>
+              Все документы по этапам проекта
+            </SheetDescription>
+          </SheetHeader>
+          <div className="mt-6 space-y-4">
+            {allDocuments.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center">Нет документов</p>
+            ) : (
+              <>
+                {stages.map((stage) => {
+                  const stageDocs = allDocuments.filter(doc => doc.project_stage_id === stage.id);
+                  if (stageDocs.length === 0) return null;
+                  
+                  return (
+                    <Card key={stage.id}>
+                      <CardHeader>
+                        <CardTitle className="text-sm font-medium">{stage.name}</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-2">
+                        {stageDocs.map((doc) => (
+                          <div key={doc.id} className="flex items-center justify-between p-2 border rounded-md">
+                            <div className="flex items-center gap-2">
+                              <FileText className="w-4 h-4 text-muted-foreground" />
+                              <span className="text-sm">{doc.name}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </>
+            )}
+          </div>
         </SheetContent>
       </Sheet>
     </>

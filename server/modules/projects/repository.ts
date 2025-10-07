@@ -8,12 +8,13 @@ import type {
   ProcessTemplate, InsertProcessTemplate,
   TemplateStage, InsertTemplateStage,
   TemplateDependency, InsertTemplateDependency,
-  StageMessage, InsertStageMessage
+  StageMessage, InsertStageMessage,
+  Document
 } from "@shared/schema";
 import { 
   projects, project_stages, project_items,
   stage_dependencies, process_templates, template_stages,
-  template_dependencies, stage_messages
+  template_dependencies, stage_messages, documents
 } from "@shared/schema";
 
 export class ProjectsRepository {
@@ -520,6 +521,28 @@ export class ProjectsRepository {
       .from(documents)
       .where(eq(documents.project_stage_id, stageId))
       .orderBy(asc(documents.created_at));
+  }
+
+  async getProjectDocuments(projectId: string): Promise<Document[]> {
+    const stages = await this.getProjectStages(projectId);
+    const stageIds = stages.map(s => s.id);
+    
+    if (stageIds.length === 0) return [];
+    
+    const allDocs = await db.select()
+      .from(documents)
+      .where(eq(documents.project_stage_id, stageIds[0]))
+      .orderBy(asc(documents.created_at));
+    
+    for (let i = 1; i < stageIds.length; i++) {
+      const docs = await db.select()
+        .from(documents)
+        .where(eq(documents.project_stage_id, stageIds[i]))
+        .orderBy(asc(documents.created_at));
+      allDocs.push(...docs);
+    }
+    
+    return allDocs;
   }
 
   // Reorder item stages atomically

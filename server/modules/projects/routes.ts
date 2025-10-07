@@ -825,3 +825,15 @@ router.get("/api/stages/:stageId/documents", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch stage documents" });
   }
 });
+
+// GET /api/projects/:projectId/documents - Get all project documents
+router.get("/api/projects/:projectId/documents", async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const documents = await projectsRepository.getProjectDocuments(projectId);
+    res.json(documents);
+  } catch (error) {
+    console.error("Error fetching project documents:", error);
+    res.status(500).json({ error: "Failed to fetch project documents" });
+  }
+});
