@@ -44,6 +44,7 @@ import { insertProjectSchema, type Project, type User, type Deal, type ProjectSt
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { StageDetailView } from "./StageDetailView";
 
 interface ProjectDetailSheetProps {
   project: Project | null;
@@ -54,6 +55,8 @@ interface ProjectDetailSheetProps {
 export function ProjectDetailSheet({ project, open, onOpenChange }: ProjectDetailSheetProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [newStageName, setNewStageName] = useState("");
+  const [selectedStage, setSelectedStage] = useState<ProjectStage | null>(null);
+  const [stageDetailOpen, setStageDetailOpen] = useState(false);
   const { toast } = useToast();
 
   const { data: users = [] } = useQuery<User[]>({
@@ -558,7 +561,13 @@ export function ProjectDetailSheet({ project, open, onOpenChange }: ProjectDetai
                                         <div className="w-4 h-4 shrink-0" />
                                       )}
 
-                                      <div className="flex-1 min-w-0">
+                                      <div 
+                                        className="flex-1 min-w-0 cursor-pointer hover-elevate active-elevate-2 rounded px-2 py-1" 
+                                        onClick={() => {
+                                          setSelectedStage(stage);
+                                          setStageDetailOpen(true);
+                                        }}
+                                      >
                                         <span className="text-sm font-medium truncate" data-testid={`stage-name-${itemIndex}-${stageIndex}`}>
                                           {stage.name}
                                         </span>
@@ -640,6 +649,29 @@ export function ProjectDetailSheet({ project, open, onOpenChange }: ProjectDetai
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Sheet open={stageDetailOpen} onOpenChange={setStageDetailOpen}>
+        <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Детали этапа</SheetTitle>
+            <SheetDescription>
+              Параметры, документы и чат этапа
+            </SheetDescription>
+          </SheetHeader>
+          {selectedStage && (
+            <div className="mt-6">
+              <StageDetailView
+                stageId={selectedStage.id}
+                stageName={selectedStage.name}
+                stageStatus={selectedStage.status}
+                stageDescription={selectedStage.description || undefined}
+                stageDeadline={selectedStage.end_date ? new Date(selectedStage.end_date).toISOString() : undefined}
+                stageCost={selectedStage.cost || undefined}
+              />
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
     </>
   );
 }
