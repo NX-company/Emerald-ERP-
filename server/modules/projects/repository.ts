@@ -139,7 +139,11 @@ export class ProjectsRepository {
     deal: any, 
     invoice: any, 
     selectedPositionIndices?: number[],
-    editedPositions?: any[]
+    editedPositions?: any[],
+    positionStagesData?: Record<string, { 
+      stages: { id: string; name: string; duration_days: number; order_index: number }[]; 
+      dependencies: { stage_id: string; depends_on_stage_id: string }[] 
+    }>
   ): Promise<Project> {
     const projectData: InsertProject = {
       name: `Проект №${invoice.name}`,
@@ -169,7 +173,25 @@ export class ProjectsRepository {
       }));
 
       if (itemsData.length > 0) {
-        await db.insert(project_items).values(itemsData);
+        const createdItems = await db.insert(project_items).values(itemsData).returning();
+        
+        // Создать этапы и зависимости для каждой позиции, если они есть
+        if (positionStagesData && selectedPositionIndices) {
+          for (let i = 0; i < selectedPositionIndices.length; i++) {
+            const positionIndex = selectedPositionIndices[i];
+            const itemId = createdItems[i]?.id;
+            const stagesData = positionStagesData[positionIndex.toString()];
+            
+            if (itemId && stagesData?.stages && stagesData.stages.length > 0) {
+              await this.createStagesWithDependencies(
+                project.id, 
+                itemId, 
+                stagesData.stages, 
+                stagesData.dependencies
+              );
+            }
+          }
+        }
       }
     } 
     // Иначе используем оригинальные позиции из счета
@@ -194,11 +216,67 @@ export class ProjectsRepository {
       }));
 
       if (itemsData.length > 0) {
-        await db.insert(project_items).values(itemsData);
+        const createdItems = await db.insert(project_items).values(itemsData).returning();
+        
+        // Создать этапы и зависимости для каждой позиции, если они есть
+        if (positionStagesData && selectedPositionIndices) {
+          for (let i = 0; i < selectedPositionIndices.length; i++) {
+            const positionIndex = selectedPositionIndices[i];
+            const itemId = createdItems[i]?.id;
+            const stagesData = positionStagesData[positionIndex.toString()];
+            
+            if (itemId && stagesData?.stages && stagesData.stages.length > 0) {
+              await this.createStagesWithDependencies(
+                project.id, 
+                itemId, 
+                stagesData.stages, 
+                stagesData.dependencies
+              );
+            }
+          }
+        }
       }
     }
 
     return project;
+  }
+
+  private async createStagesWithDependencies(
+    projectId: string, 
+    itemId: string, 
+    stages: { id: string; name: string; duration_days: number; order_index: number }[],
+    dependencies: { stage_id: string; depends_on_stage_id: string }[]
+  ): Promise<void> {
+    // Карта для сопоставления временных ID с реальными ID этапов
+    const stageIdMap = new Map<string, string>();
+    
+    // Создать все этапы
+    for (const stage of stages) {
+      const newStage = await this.createProjectStage({
+        project_id: projectId,
+        item_id: itemId,
+        name: stage.name,
+        status: "pending",
+        order: stage.order_index,
+      });
+      
+      stageIdMap.set(stage.id, newStage.id);
+    }
+    
+    // Создать зависимости между этапами
+    if (dependencies && dependencies.length > 0) {
+      for (const dep of dependencies) {
+        const realStageId = stageIdMap.get(dep.stage_id);
+        const realDependsOnStageId = stageIdMap.get(dep.depends_on_stage_id);
+        
+        if (realStageId && realDependsOnStageId) {
+          await this.createStageDependency({
+            stage_id: realStageId,
+            depends_on_stage_id: realDependsOnStageId,
+          });
+        }
+      }
+    }
   }
 
   // Project Items methods
