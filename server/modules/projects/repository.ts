@@ -145,6 +145,78 @@ export class ProjectsRepository {
     return result.length > 0;
   }
 
+  async startStage(id: string): Promise<ProjectStage | undefined> {
+    const result = await db.update(project_stages)
+      .set({ 
+        actual_start_date: new Date(),
+        status: 'in_progress',
+        updated_at: new Date() 
+      })
+      .where(eq(project_stages.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async completeStage(id: string): Promise<ProjectStage | undefined> {
+    const result = await db.update(project_stages)
+      .set({ 
+        actual_end_date: new Date(),
+        status: 'completed',
+        updated_at: new Date() 
+      })
+      .where(eq(project_stages.id, id))
+      .returning();
+    
+    if (result[0]) {
+      await this.updateProjectProgress(result[0].project_id);
+    }
+    
+    return result[0];
+  }
+
+  async getProjectTimeline(projectId: string): Promise<any> {
+    const project = await this.getProjectById(projectId);
+    if (!project) return null;
+
+    const stages = await db.select().from(project_stages)
+      .where(eq(project_stages.project_id, projectId))
+      .orderBy(asc(project_stages.order));
+
+    const timeline = stages.map(stage => {
+      const delay = stage.actual_end_date && stage.planned_end_date 
+        ? Math.ceil((new Date(stage.actual_end_date).getTime() - new Date(stage.planned_end_date).getTime()) / (1000 * 60 * 60 * 24))
+        : null;
+
+      return {
+        ...stage,
+        delay_days: delay,
+      };
+    });
+
+    const completedStages = stages.filter(s => s.status === 'completed');
+    const inProgressStages = stages.filter(s => s.status === 'in_progress');
+    const pendingStages = stages.filter(s => s.status === 'pending');
+
+    const finalDeadline = stages.reduce((latest, stage) => {
+      const endDate = stage.actual_end_date || stage.planned_end_date;
+      if (!endDate) return latest;
+      const date = new Date(endDate);
+      return date > latest ? date : latest;
+    }, new Date(0));
+
+    return {
+      project,
+      stages: timeline,
+      stats: {
+        total: stages.length,
+        completed: completedStages.length,
+        in_progress: inProgressStages.length,
+        pending: pendingStages.length,
+        final_deadline: finalDeadline.getTime() > 0 ? finalDeadline : null,
+      },
+    };
+  }
+
   async getProjectByDealId(dealId: string): Promise<Project | undefined> {
     const result = await db.select().from(projects).where(eq(projects.deal_id, dealId));
     return result[0];

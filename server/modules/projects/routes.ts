@@ -305,6 +305,60 @@ router.delete("/api/projects/stages/:stageId", async (req, res) => {
   }
 });
 
+// POST /api/projects/stages/:stageId/start - Start stage execution
+router.post("/api/projects/stages/:stageId/start", async (req, res) => {
+  try {
+    const { stageId } = req.params;
+    const updatedStage = await projectsRepository.startStage(stageId);
+    
+    if (!updatedStage) {
+      res.status(404).json({ error: "Project stage not found" });
+      return;
+    }
+    
+    res.json(updatedStage);
+  } catch (error) {
+    console.error("Error starting stage:", error);
+    res.status(500).json({ error: "Failed to start stage" });
+  }
+});
+
+// POST /api/projects/stages/:stageId/complete - Complete stage execution
+router.post("/api/projects/stages/:stageId/complete", async (req, res) => {
+  try {
+    const { stageId } = req.params;
+    const updatedStage = await projectsRepository.completeStage(stageId);
+    
+    if (!updatedStage) {
+      res.status(404).json({ error: "Project stage not found" });
+      return;
+    }
+    
+    res.json(updatedStage);
+  } catch (error) {
+    console.error("Error completing stage:", error);
+    res.status(500).json({ error: "Failed to complete stage" });
+  }
+});
+
+// GET /api/projects/:id/timeline - Get project timeline statistics
+router.get("/api/projects/:id/timeline", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const timeline = await projectsRepository.getProjectTimeline(id);
+    
+    if (!timeline) {
+      res.status(404).json({ error: "Project not found" });
+      return;
+    }
+    
+    res.json(timeline);
+  } catch (error) {
+    console.error("Error fetching project timeline:", error);
+    res.status(500).json({ error: "Failed to fetch project timeline" });
+  }
+});
+
 // ===== Project Items Routes =====
 
 // GET /api/projects/:projectId/items - Get all items for a project
