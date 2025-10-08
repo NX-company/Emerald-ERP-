@@ -17,6 +17,8 @@ import { ProjectItemDialog } from "@/components/ProjectItemDialog";
 import { StageDialog } from "@/components/StageDialog";
 import { StageFlowEditor } from "@/components/StageFlowEditor";
 import { StatusBadge } from "@/components/StatusBadge";
+import { GanttChart } from "@/components/GanttChart";
+import { ProjectTimeline } from "@/components/ProjectTimeline";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Project, ProjectItem, ProjectStage, User } from "@shared/schema";
@@ -613,13 +615,9 @@ export default function ProjectDetailPage() {
               )}
             </TabsContent>
 
-            <TabsContent value="gantt" className="mt-6" data-testid="content-gantt">
-              <div className="text-center py-12 space-y-2">
-                <Calendar className="w-12 h-12 mx-auto text-muted-foreground" />
-                <p className="text-sm text-muted-foreground" data-testid="text-gantt-placeholder">
-                  Диаграмма Ганта будет добавлена в следующей версии
-                </p>
-              </div>
+            <TabsContent value="gantt" className="mt-6 space-y-4" data-testid="content-gantt">
+              <ProjectTimeline projectId={id!} />
+              <GanttChart stages={project?.stages || []} />
             </TabsContent>
 
             <TabsContent value="templates" className="mt-6" data-testid="content-templates">

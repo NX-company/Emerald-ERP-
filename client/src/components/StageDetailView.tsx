@@ -90,6 +90,8 @@ export function StageDetailView({
     onSuccess: () => {
       if (projectId) {
         queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "stages"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "timeline"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId] });
         queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
       }
       queryClient.invalidateQueries({ queryKey: ["/api/projects/stages", stageId] });
@@ -108,6 +110,8 @@ export function StageDetailView({
     onSuccess: () => {
       if (projectId) {
         queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "stages"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "timeline"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId] });
         queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
       }
       queryClient.invalidateQueries({ queryKey: ["/api/projects/stages", stageId] });

@@ -3,11 +3,13 @@ import { projectsRepository } from "./repository";
 import { 
   insertProjectSchema, insertProjectStageSchema, insertProjectItemSchema,
   insertStageDependencySchema, insertProcessTemplateSchema, insertTemplateStageSchema,
-  insertTemplateDependencySchema, insertStageMessageSchema
+  insertTemplateDependencySchema, insertStageMessageSchema, project_stages
 } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
 import { salesRepository } from "../sales/repository";
 import { z } from "zod";
+import { db } from "../../db";
+import { eq } from "drizzle-orm";
 
 export const router = Router();
 
@@ -356,6 +358,24 @@ router.get("/api/projects/:id/timeline", async (req, res) => {
   } catch (error) {
     console.error("Error fetching project timeline:", error);
     res.status(500).json({ error: "Failed to fetch project timeline" });
+  }
+});
+
+// GET /api/projects/stages/:stageId - Get single stage by ID
+router.get("/api/projects/stages/:stageId", async (req, res) => {
+  try {
+    const { stageId } = req.params;
+    const result = await db.select().from(project_stages).where(eq(project_stages.id, stageId));
+    
+    if (!result[0]) {
+      res.status(404).json({ error: "Stage not found" });
+      return;
+    }
+    
+    res.json(result[0]);
+  } catch (error) {
+    console.error("Error fetching stage:", error);
+    res.status(500).json({ error: "Failed to fetch stage" });
   }
 });
 
