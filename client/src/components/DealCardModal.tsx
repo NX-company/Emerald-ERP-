@@ -5,7 +5,7 @@ import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Mail, Phone, Building2, DollarSign, MessageSquare, CheckSquare, Activity, Brain, Plus, FolderOpen, FileText, Trash2 } from "lucide-react";
+import { Mail, Phone, Building2, DollarSign, MessageSquare, CheckSquare, Activity, Brain, Plus, FolderOpen, FileText, Trash2, Sparkles } from "lucide-react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
@@ -21,6 +21,7 @@ import { AllDocumentsDialog } from "@/components/AllDocumentsDialog";
 import type { UploadResult } from "@uppy/core";
 import { X, Download } from "lucide-react";
 import { useLocation } from "wouter";
+import { AiAssistantDialog } from "@/components/AiAssistantDialog";
 
 interface DealCardModalProps {
   dealId: string | null;
@@ -69,6 +70,7 @@ export function DealCardModal({ dealId, open, onOpenChange }: DealCardModalProps
   const [allDocumentsDialogOpen, setAllDocumentsDialogOpen] = useState(false);
   const [createProjectDialogOpen, setCreateProjectDialogOpen] = useState(false);
   const [editingDocumentId, setEditingDocumentId] = useState<string | undefined>();
+  const [aiAssistantOpen, setAiAssistantOpen] = useState(false);
   
   const { toast } = useToast();
   const [, setLocation] = useLocation();
@@ -486,10 +488,10 @@ export function DealCardModal({ dealId, open, onOpenChange }: DealCardModalProps
                 <Button 
                   variant="outline" 
                   className="w-full justify-start gap-2" 
-                  disabled
+                  onClick={() => setAiAssistantOpen(true)}
                   data-testid="button-ai-calculate"
                 >
-                  <Brain className="w-4 h-4" />
+                  <Sparkles className="w-4 h-4" />
                   AI Просчёт
                 </Button>
 
@@ -699,6 +701,16 @@ export function DealCardModal({ dealId, open, onOpenChange }: DealCardModalProps
         isPending={createProjectFromInvoice.isPending}
         dealName={deal?.client_name || ""}
       />
+
+      {dealId && (
+        <AiAssistantDialog
+          open={aiAssistantOpen}
+          onOpenChange={setAiAssistantOpen}
+          dealId={dealId}
+          userId={getCurrentUserId()}
+          dealName={deal?.client_name}
+        />
+      )}
     </Dialog>
   );
 }
