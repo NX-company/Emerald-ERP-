@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Calendar, DollarSign, Send, Paperclip, FileText, Download } from "lucide-react";
+import { Calendar, DollarSign, Send, Paperclip, FileText, Download, Play, CheckCircle } from "lucide-react";
+import type { ProjectStage } from "@shared/schema";
 
 interface StageDetailViewProps {
   stageId: string;
@@ -77,6 +78,47 @@ export function StageDetailView({
     },
   });
 
+  const { data: stage } = useQuery<ProjectStage>({
+    queryKey: ["/api/projects/stages", stageId],
+    enabled: !!stageId,
+  });
+
+  const startStageMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("POST", `/api/projects/stages/${stageId}/start`, {});
+    },
+    onSuccess: () => {
+      if (projectId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "stages"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
+      }
+      queryClient.invalidateQueries({ queryKey: ["/api/projects/stages", stageId] });
+      onStatusChange?.();
+      toast({ description: "Этап начат" });
+    },
+    onError: (error: Error) => {
+      toast({ description: error.message || "Ошибка начала этапа", variant: "destructive" });
+    },
+  });
+
+  const completeStageMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("POST", `/api/projects/stages/${stageId}/complete`, {});
+    },
+    onSuccess: () => {
+      if (projectId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "stages"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
+      }
+      queryClient.invalidateQueries({ queryKey: ["/api/projects/stages", stageId] });
+      onStatusChange?.();
+      toast({ description: "Этап завершен" });
+    },
+    onError: (error: Error) => {
+      toast({ description: error.message || "Ошибка завершения этапа", variant: "destructive" });
+    },
+  });
+
   const updateStatusMutation = useMutation({
     mutationFn: async (status: string) => {
       await apiRequest("PUT", `/api/projects/stages/${stageId}`, { status });
@@ -95,6 +137,7 @@ export function StageDetailView({
         queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
       }
       queryClient.invalidateQueries({ queryKey: ["/api/stages", stageId, "messages"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/projects/stages", stageId] });
       onStatusChange?.();
       toast({ description: "Статус обновлен" });
     },
@@ -198,7 +241,7 @@ export function StageDetailView({
             </Select>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <div className="flex gap-4 text-sm text-muted-foreground">
             {stageDeadline && (
               <div className="flex items-center gap-1">
@@ -213,6 +256,62 @@ export function StageDetailView({
               </div>
             )}
           </div>
+
+          {stage && (
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                {stage.planned_start_date && (
+                  <div>
+                    <p className="text-muted-foreground">План начала</p>
+                    <p className="font-medium">{new Date(stage.planned_start_date).toLocaleDateString('ru-RU')}</p>
+                  </div>
+                )}
+                {stage.planned_end_date && (
+                  <div>
+                    <p className="text-muted-foreground">План окончания</p>
+                    <p className="font-medium">{new Date(stage.planned_end_date).toLocaleDateString('ru-RU')}</p>
+                  </div>
+                )}
+                {stage.actual_start_date && (
+                  <div>
+                    <p className="text-muted-foreground">Фактически начат</p>
+                    <p className="font-medium">{new Date(stage.actual_start_date).toLocaleDateString('ru-RU')}</p>
+                  </div>
+                )}
+                {stage.actual_end_date && (
+                  <div>
+                    <p className="text-muted-foreground">Фактически завершен</p>
+                    <p className="font-medium">{new Date(stage.actual_end_date).toLocaleDateString('ru-RU')}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                {!stage.actual_start_date && stage.status !== 'in_progress' && (
+                  <Button 
+                    onClick={() => startStageMutation.mutate()}
+                    disabled={startStageMutation.isPending}
+                    data-testid="button-start-stage"
+                    size="sm"
+                  >
+                    <Play className="w-4 h-4 mr-2" />
+                    Начать этап
+                  </Button>
+                )}
+                {stage.status === 'in_progress' && !stage.actual_end_date && (
+                  <Button 
+                    onClick={() => completeStageMutation.mutate()}
+                    disabled={completeStageMutation.isPending}
+                    data-testid="button-complete-stage"
+                    size="sm"
+                  >
+                    <CheckCircle className="w-4 h-4 mr-2" />
+                    Завершить этап
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
