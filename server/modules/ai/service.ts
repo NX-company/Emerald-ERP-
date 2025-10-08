@@ -1,8 +1,10 @@
 import OpenAI from "openai";
 import { aiRepository } from "./repository";
 import type { InsertAiChatMessage, InsertAiCorrection } from "@shared/schema";
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const pdfParse = require('pdf-parse');
 
-// the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const SYSTEM_PROMPT = `Вы - эксперт по расчёту мебели и созданию коммерческих предложений.
@@ -47,14 +49,15 @@ export class AiService {
         ).join('\n')}`
       : '';
 
+    const pdfBuffer = Buffer.from(base64Pdf, 'base64');
+    const pdfData = await pdfParse(pdfBuffer);
+    const pdfText = pdfData.text;
+
     const messages: any[] = [
       { role: "system", content: SYSTEM_PROMPT + materialContext + correctionContext },
       {
         role: "user",
-        content: [
-          { type: "text", text: userMessage || "Проанализируйте чертёж и создайте расчёт КП" },
-          { type: "image_url", image_url: { url: `data:application/pdf;base64,${base64Pdf}` } }
-        ]
+        content: `${userMessage || "Проанализируйте чертёж и создайте расчёт КП"}. Верните результат в формате JSON.\n\nТекст из PDF документа:\n${pdfText}`
       }
     ];
 
