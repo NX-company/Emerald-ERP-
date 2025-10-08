@@ -290,6 +290,33 @@ export function StageDetailView({
                 )}
               </div>
 
+              {stage.status === 'in_progress' && stage.planned_end_date && (
+                <div className="pt-2">
+                  {(() => {
+                    const now = new Date();
+                    const deadline = new Date(stage.planned_end_date);
+                    const diffTime = deadline.getTime() - now.getTime();
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    const isOverdue = diffDays < 0;
+                    
+                    return (
+                      <div className={`p-3 rounded-md ${isOverdue ? 'bg-destructive/10' : 'bg-primary/10'}`}>
+                        <p className="text-sm font-medium">
+                          {isOverdue ? (
+                            <>Просрочка: {Math.abs(diffDays)} дн.</>
+                          ) : (
+                            <>Осталось: {diffDays} дн.</>
+                          )}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Крайний срок: {deadline.toLocaleDateString('ru-RU')}
+                        </p>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
               <div className="flex gap-2 pt-2">
                 {!stage.actual_start_date && stage.status !== 'in_progress' && (
                   <Button 

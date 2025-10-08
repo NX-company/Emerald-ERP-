@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { 
   ArrowLeft, Plus, Edit, Trash2, Calendar, FileText, Layers, 
-  AlertCircle, GripVertical, MessageSquare
+  AlertCircle, GripVertical, MessageSquare, Play
 } from "lucide-react";
 import { ProjectItemDialog } from "@/components/ProjectItemDialog";
 import { StageDialog } from "@/components/StageDialog";
@@ -315,6 +315,21 @@ export default function ProjectDetailPage() {
     }
   };
 
+  const startProjectMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("POST", `/api/projects/${id}/start`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/projects", id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/projects", id, "stages"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
+      toast({ description: "Проект запущен" });
+    },
+    onError: (error: Error) => {
+      toast({ description: error.message || "Ошибка запуска проекта", variant: "destructive" });
+    },
+  });
+
   const reorderStages = useMutation({
     mutationFn: async (stageIds: string[]) => 
       apiRequest('PATCH', `/api/projects/${id}/items/${selectedItemId}/stages/reorder`, {
@@ -415,6 +430,16 @@ export default function ProjectDetailPage() {
               </div>
               <div className="flex items-center gap-2">
                 <StatusBadge status={project.status} data-testid="badge-status" />
+                {!project.started_at && project.status === "pending" && (
+                  <Button 
+                    onClick={() => startProjectMutation.mutate()} 
+                    disabled={startProjectMutation.isPending}
+                    data-testid="button-start-project"
+                  >
+                    <Play className="w-4 h-4 mr-2" />
+                    Запустить проект
+                  </Button>
+                )}
               </div>
             </div>
 
@@ -422,11 +447,11 @@ export default function ProjectDetailPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">Срок сдачи</p>
+                <p className="text-sm text-muted-foreground">Длительность</p>
                 <div className="flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-muted-foreground" />
-                  <p className="text-sm" data-testid="text-deadline">
-                    {formatDate(project.deadline)}
+                  <p className="text-sm" data-testid="text-duration">
+                    {project.duration_days || 0} дн.
                   </p>
                 </div>
               </div>

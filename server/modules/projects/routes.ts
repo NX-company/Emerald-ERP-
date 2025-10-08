@@ -307,6 +307,24 @@ router.delete("/api/projects/stages/:stageId", async (req, res) => {
   }
 });
 
+// POST /api/projects/:id/start - Start project execution
+router.post("/api/projects/:id/start", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updatedProject = await projectsRepository.startProject(id);
+    
+    if (!updatedProject) {
+      res.status(404).json({ error: "Project not found" });
+      return;
+    }
+    
+    res.json(updatedProject);
+  } catch (error) {
+    console.error("Error starting project:", error);
+    res.status(500).json({ error: "Failed to start project" });
+  }
+});
+
 // POST /api/projects/stages/:stageId/start - Start stage execution
 router.post("/api/projects/stages/:stageId/start", async (req, res) => {
   try {

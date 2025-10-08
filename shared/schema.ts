@@ -91,6 +91,7 @@ export const projects = pgTable("projects", {
   status: statusEnum("status").notNull().default("pending"),
   progress: integer("progress").default(0),
   duration_days: integer("duration_days"),
+  started_at: timestamp("started_at"),
   manager_id: varchar("manager_id").references(() => users.id),
   created_at: timestamp("created_at").defaultNow().notNull(),
   updated_at: timestamp("updated_at").defaultNow().notNull(),

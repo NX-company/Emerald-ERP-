@@ -146,6 +146,44 @@ export class ProjectsRepository {
     return result.length > 0;
   }
 
+  async startProject(id: string): Promise<Project | undefined> {
+    const result = await db.update(projects)
+      .set({ 
+        started_at: new Date(),
+        status: 'in_progress',
+        updated_at: new Date() 
+      })
+      .where(eq(projects.id, id))
+      .returning();
+    
+    if (result[0]) {
+      const stages = await this.getProjectStages(id);
+      const startDate = new Date(result[0].started_at!);
+      
+      for (let i = 0; i < stages.length; i++) {
+        const stage = stages[i];
+        const prevStages = stages.slice(0, i);
+        const daysOffset = prevStages.reduce((sum, s) => sum + (s.duration_days || 0), 0);
+        
+        const plannedStart = new Date(startDate);
+        plannedStart.setDate(plannedStart.getDate() + daysOffset);
+        
+        const plannedEnd = new Date(plannedStart);
+        plannedEnd.setDate(plannedEnd.getDate() + (stage.duration_days || 0));
+        
+        await db.update(project_stages)
+          .set({ 
+            planned_start_date: plannedStart,
+            planned_end_date: plannedEnd,
+            updated_at: new Date()
+          })
+          .where(eq(project_stages.id, stage.id));
+      }
+    }
+    
+    return result[0];
+  }
+
   async startStage(id: string): Promise<ProjectStage | undefined> {
     const result = await db.update(project_stages)
       .set({ 
