@@ -342,6 +342,58 @@ export const insertCompanySettingsSchema = createInsertSchema(company_settings).
 export type InsertCompanySettings = z.infer<typeof insertCompanySettingsSchema>;
 export type CompanySettings = typeof company_settings.$inferSelect;
 
+export const ai_chat_messages = pgTable("ai_chat_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  deal_id: varchar("deal_id").references(() => deals.id, { onDelete: "cascade" }),
+  user_id: varchar("user_id").references(() => users.id).notNull(),
+  role: text("role").notNull(),
+  content: text("content").notNull(),
+  created_at: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertAiChatMessageSchema = createInsertSchema(ai_chat_messages).omit({
+  id: true,
+  created_at: true,
+});
+
+export type InsertAiChatMessage = z.infer<typeof insertAiChatMessageSchema>;
+export type AiChatMessage = typeof ai_chat_messages.$inferSelect;
+
+export const ai_corrections = pgTable("ai_corrections", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  deal_id: varchar("deal_id").references(() => deals.id, { onDelete: "cascade" }),
+  user_id: varchar("user_id").references(() => users.id).notNull(),
+  original_data: text("original_data").notNull(),
+  corrected_data: text("corrected_data").notNull(),
+  correction_type: text("correction_type").notNull(),
+  created_at: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertAiCorrectionSchema = createInsertSchema(ai_corrections).omit({
+  id: true,
+  created_at: true,
+});
+
+export type InsertAiCorrection = z.infer<typeof insertAiCorrectionSchema>;
+export type AiCorrection = typeof ai_corrections.$inferSelect;
+
+export const material_prices = pgTable("material_prices", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  category: text("category").notNull(),
+  unit: text("unit").notNull(),
+  price: numeric("price", { precision: 12, scale: 2 }).notNull(),
+  updated_at: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertMaterialPriceSchema = createInsertSchema(material_prices).omit({
+  id: true,
+  updated_at: true,
+});
+
+export type InsertMaterialPrice = z.infer<typeof insertMaterialPriceSchema>;
+export type MaterialPrice = typeof material_prices.$inferSelect;
+
 export const deal_messages = pgTable("deal_messages", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   deal_id: varchar("deal_id").references(() => deals.id, { onDelete: "cascade" }).notNull(),
