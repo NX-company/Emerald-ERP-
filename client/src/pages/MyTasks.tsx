@@ -61,10 +61,10 @@ export default function MyTasks() {
                     <p className="text-sm">{task.description}</p>
                   )}
                   <div className="flex gap-4 text-sm text-muted-foreground">
-                    {task.end_date && (
+                    {task.planned_end_date && (
                       <div className="flex items-center gap-1">
                         <Calendar className="w-4 h-4" />
-                        {new Date(task.end_date).toLocaleDateString('ru-RU')}
+                        {new Date(task.planned_end_date).toLocaleDateString('ru-RU')}
                       </div>
                     )}
                     {task.cost && (
@@ -92,7 +92,7 @@ export default function MyTasks() {
               stageName={selectedStage.name}
               stageStatus={selectedStage.status}
               stageDescription={selectedStage.description}
-              stageDeadline={selectedStage.end_date}
+              stageDeadline={selectedStage.planned_end_date}
               stageCost={selectedStage.cost}
             />
           )}

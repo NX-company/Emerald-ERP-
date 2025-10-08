@@ -24,8 +24,12 @@ const formSchema = insertProjectStageSchema
   .extend({
     name: z.string().min(1, "Название обязательно"),
     description: z.string().optional(),
-    start_date: z.date().nullable().optional(),
-    end_date: z.date().nullable().optional(),
+    duration_days: z.union([z.string(), z.number(), z.null()]).optional().transform((val) => {
+      if (val === null || val === undefined || val === "") return undefined;
+      return typeof val === "string" ? parseInt(val) : val;
+    }),
+    planned_start_date: z.date().nullable().optional(),
+    planned_end_date: z.date().nullable().optional(),
     assignee_id: z.string().nullable().optional(),
     cost: z.union([z.string(), z.number(), z.null()]).optional().transform((val) => {
       if (val === null || val === undefined || val === "") return undefined;
@@ -58,8 +62,9 @@ export function StageDialog({ open, onOpenChange, projectId, itemId, stage }: St
     defaultValues: {
       name: "",
       description: "",
-      start_date: null,
-      end_date: null,
+      duration_days: undefined,
+      planned_start_date: null,
+      planned_end_date: null,
       assignee_id: null,
       cost: undefined,
       status: "pending",
@@ -71,8 +76,9 @@ export function StageDialog({ open, onOpenChange, projectId, itemId, stage }: St
       form.reset({
         name: stage.name,
         description: stage.description || "",
-        start_date: stage.start_date ? new Date(stage.start_date) : null,
-        end_date: stage.end_date ? new Date(stage.end_date) : null,
+        duration_days: stage.duration_days || undefined,
+        planned_start_date: stage.planned_start_date ? new Date(stage.planned_start_date) : null,
+        planned_end_date: stage.planned_end_date ? new Date(stage.planned_end_date) : null,
         assignee_id: stage.assignee_id || null,
         cost: stage.cost || undefined,
         status: stage.status,
@@ -81,8 +87,9 @@ export function StageDialog({ open, onOpenChange, projectId, itemId, stage }: St
       form.reset({
         name: "",
         description: "",
-        start_date: null,
-        end_date: null,
+        duration_days: undefined,
+        planned_start_date: null,
+        planned_end_date: null,
         assignee_id: null,
         cost: undefined,
         status: "pending",
@@ -103,8 +110,8 @@ export function StageDialog({ open, onOpenChange, projectId, itemId, stage }: St
         project_id: projectId,
         item_id: itemId,
         order: maxOrder + 1,
-        start_date: data.start_date || null,
-        end_date: data.end_date || null,
+        planned_start_date: data.planned_start_date || null,
+        planned_end_date: data.planned_end_date || null,
       });
     },
     onSuccess: () => {
@@ -131,8 +138,8 @@ export function StageDialog({ open, onOpenChange, projectId, itemId, stage }: St
     mutationFn: async (data: FormData) => {
       return await apiRequest('PUT', `/api/projects/stages/${stage?.id}`, {
         ...data,
-        start_date: data.start_date || null,
-        end_date: data.end_date || null,
+        planned_start_date: data.planned_start_date || null,
+        planned_end_date: data.planned_end_date || null,
       });
     },
     onSuccess: () => {
@@ -200,11 +207,23 @@ export function StageDialog({ open, onOpenChange, projectId, itemId, stage }: St
             />
           </div>
 
+          <div className="space-y-2">
+            <Label htmlFor="duration_days">Длительность (дней)</Label>
+            <Input
+              id="duration_days"
+              type="number"
+              min="1"
+              {...form.register("duration_days")}
+              data-testid="input-duration-days"
+              placeholder="Например: 5"
+            />
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Дата начала</Label>
+              <Label>Плановая дата начала</Label>
               <Controller
-                name="start_date"
+                name="planned_start_date"
                 control={form.control}
                 render={({ field }) => (
                   <Popover>
@@ -235,9 +254,9 @@ export function StageDialog({ open, onOpenChange, projectId, itemId, stage }: St
             </div>
 
             <div className="space-y-2">
-              <Label>Дата окончания</Label>
+              <Label>Плановая дата окончания</Label>
               <Controller
-                name="end_date"
+                name="planned_end_date"
                 control={form.control}
                 render={({ field }) => (
                   <Popover>

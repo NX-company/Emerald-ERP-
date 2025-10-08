@@ -346,7 +346,7 @@ export function StageFlowEditor({ projectId, itemId, itemName }: StageFlowEditor
               stageName={selectedStage.name}
               stageStatus={selectedStage.status}
               stageDescription={selectedStage.description || undefined}
-              stageDeadline={selectedStage.end_date ? selectedStage.end_date.toString() : undefined}
+              stageDeadline={selectedStage.planned_end_date ? selectedStage.planned_end_date.toString() : undefined}
               stageCost={selectedStage.cost || undefined}
             />
           )}

@@ -101,7 +101,7 @@ function StageCard({ stage, users, onEdit, onDelete, onViewDetails, formatDate, 
             <div className="space-y-1">
               <p className="text-muted-foreground text-xs">Даты</p>
               <p data-testid={`text-stage-dates-${stage.id}`}>
-                {formatDate(stage.start_date)} - {formatDate(stage.end_date)}
+                {formatDate(stage.planned_start_date)} - {formatDate(stage.planned_end_date)}
               </p>
             </div>
 
