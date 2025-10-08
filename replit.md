@@ -42,6 +42,7 @@ Preferred communication style: Simple, everyday language.
 - `stage_messages`: Stage-level chat for executor communication
 - `documents`: Document storage with `project_stage_id` and `template_stage_id` for stage-specific file uploads
 - `projects.invoice_id`: Links projects to source invoices
+- `projects.duration_days`: Auto-calculated total project duration (sum of all stage durations)
 - MyTasks page (`/my-tasks`): Dedicated view for executors to track assigned stages with filtering
 - StageDetailView component: Integrated stage management with chat, file upload, and progress tracking
 **File Storage**: Document management tracks metadata in DB; actual file storage through Replit Object Storage with ACL-based access control.

@@ -76,13 +76,14 @@ export class ProjectsRepository {
     const stages = await this.getProjectStages(projectId);
     
     if (stages.length === 0) {
-      return this.updateProject(projectId, { progress: 0 });
+      return this.updateProject(projectId, { progress: 0, duration_days: 0 });
     }
     
     const completedStages = stages.filter(stage => stage.status === "completed").length;
     const progress = Math.round((completedStages / stages.length) * 100);
+    const durationDays = stages.reduce((sum, stage) => sum + (stage.duration_days || 0), 0);
     
-    return this.updateProject(projectId, { progress });
+    return this.updateProject(projectId, { progress, duration_days: durationDays });
   }
 
   // Project stage methods
@@ -239,7 +240,7 @@ export class ProjectsRepository {
       client_name: deal.client_name,
       deal_id: dealId,
       invoice_id: invoiceId,
-      deadline: deal.deadline,
+      duration_days: 0,
       manager_id: deal.manager_id,
       status: "pending",
       progress: 0,

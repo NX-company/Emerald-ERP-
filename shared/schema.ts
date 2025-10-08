@@ -90,7 +90,7 @@ export const projects = pgTable("projects", {
   invoice_id: varchar("invoice_id").references(() => deal_documents.id),
   status: statusEnum("status").notNull().default("pending"),
   progress: integer("progress").default(0),
-  deadline: timestamp("deadline"),
+  duration_days: integer("duration_days"),
   manager_id: varchar("manager_id").references(() => users.id),
   created_at: timestamp("created_at").defaultNow().notNull(),
   updated_at: timestamp("updated_at").defaultNow().notNull(),

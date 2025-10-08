@@ -96,7 +96,7 @@ export function ProjectDetailSheet({ project, open, onOpenChange }: ProjectDetai
       deal_id: project?.deal_id || "",
       status: project?.status || "pending",
       progress: project?.progress || 0,
-      deadline: project?.deadline ? new Date(project.deadline).toISOString().slice(0, 16) : "",
+      duration_days: project?.duration_days || 0,
       manager_id: project?.manager_id || "",
     },
   });
@@ -109,7 +109,7 @@ export function ProjectDetailSheet({ project, open, onOpenChange }: ProjectDetai
         deal_id: project.deal_id || "",
         status: project.status || "pending",
         progress: project.progress || 0,
-        deadline: project.deadline ? new Date(project.deadline).toISOString().slice(0, 16) : "",
+        duration_days: project.duration_days || 0,
         manager_id: project.manager_id || "",
       });
     }
@@ -146,7 +146,6 @@ export function ProjectDetailSheet({ project, open, onOpenChange }: ProjectDetai
       const projectData = {
         ...data,
         deal_id: data.deal_id || null,
-        deadline: data.deadline ? new Date(data.deadline).toISOString() : null,
         manager_id: data.manager_id || null,
       };
       await apiRequest("PUT", `/api/projects/${project?.id}`, projectData);
@@ -419,15 +418,17 @@ export function ProjectDetailSheet({ project, open, onOpenChange }: ProjectDetai
 
               <FormField
                 control={form.control}
-                name="deadline"
+                name="duration_days"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Срок</FormLabel>
+                    <FormLabel>Длительность (дней)</FormLabel>
                     <FormControl>
                       <Input 
-                        {...field} 
-                        type="datetime-local" 
-                        data-testid="input-project-deadline"
+                        {...field}
+                        value={field.value || 0}
+                        type="number"
+                        disabled
+                        data-testid="input-project-duration"
                       />
                     </FormControl>
                     <FormMessage />
@@ -680,7 +681,7 @@ export function ProjectDetailSheet({ project, open, onOpenChange }: ProjectDetai
                 stageName={selectedStage.name}
                 stageStatus={selectedStage.status}
                 stageDescription={selectedStage.description || undefined}
-                stageDeadline={selectedStage.end_date ? new Date(selectedStage.end_date).toISOString() : undefined}
+                stageDeadline={selectedStage.planned_end_date ? new Date(selectedStage.planned_end_date).toISOString() : undefined}
                 stageCost={selectedStage.cost || undefined}
                 projectId={project?.id}
                 onStatusChange={() => {

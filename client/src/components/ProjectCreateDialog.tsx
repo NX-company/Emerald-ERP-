@@ -55,7 +55,7 @@ export function ProjectCreateDialog({ open, onOpenChange }: ProjectCreateDialogP
       deal_id: "",
       status: "pending" as const,
       progress: 0,
-      deadline: "",
+      duration_days: 0,
       manager_id: "",
     },
   });
@@ -65,7 +65,6 @@ export function ProjectCreateDialog({ open, onOpenChange }: ProjectCreateDialogP
       const projectData = {
         ...data,
         deal_id: data.deal_id || null,
-        deadline: data.deadline ? new Date(data.deadline).toISOString() : null,
         manager_id: data.manager_id || null,
       };
       await apiRequest("POST", "/api/projects", projectData);
@@ -220,24 +219,6 @@ export function ProjectCreateDialog({ open, onOpenChange }: ProjectCreateDialogP
                       max={100}
                       step={5}
                       data-testid="slider-create-project-progress"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="deadline"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Срок</FormLabel>
-                  <FormControl>
-                    <Input 
-                      {...field} 
-                      type="datetime-local" 
-                      data-testid="input-create-project-deadline"
                     />
                   </FormControl>
                   <FormMessage />

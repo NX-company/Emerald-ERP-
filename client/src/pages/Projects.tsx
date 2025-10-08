@@ -65,7 +65,7 @@ export default function Projects() {
     client: project.client_name,
     progress: project.progress || 0,
     status: project.status,
-    deadline: formatDate(project.deadline),
+    durationDays: project.duration_days || 0,
     manager: getUserName(project.manager_id),
     stages: project.stages.map(stage => ({
       name: stage.name,

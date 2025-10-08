@@ -11,12 +11,12 @@ interface ProjectCardProps {
   client: string;
   progress: number;
   status: "pending" | "in_progress" | "completed" | "overdue";
-  deadline: string;
+  durationDays: number;
   manager: string;
   stages: { name: string; status: "pending" | "in_progress" | "completed" }[];
 }
 
-export function ProjectCard({ id, name, client, progress, status, deadline, manager, stages }: ProjectCardProps) {
+export function ProjectCard({ id, name, client, progress, status, durationDays, manager, stages }: ProjectCardProps) {
   return (
     <Card className="hover-elevate active-elevate-2 cursor-pointer" data-testid={`card-project-${id}`}>
       <CardHeader className="pb-3">
@@ -46,9 +46,9 @@ export function ProjectCard({ id, name, client, progress, status, deadline, mana
         <div className="flex items-center justify-between text-sm">
           <div className="flex items-center gap-1 text-muted-foreground">
             <Calendar className="h-3 w-3" />
-            <span>Срок</span>
+            <span>Длительность</span>
           </div>
-          <span className="text-xs">{deadline}</span>
+          <span className="text-xs">{durationDays} дн.</span>
         </div>
 
         <div className="flex items-center justify-between text-sm">
