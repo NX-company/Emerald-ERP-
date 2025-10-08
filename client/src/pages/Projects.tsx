@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Plus, Calendar } from "lucide-react";
 import { ProjectCard } from "@/components/ProjectCard";
 import { ProjectDetailSheet } from "@/components/ProjectDetailSheet";
 import { ProjectCreateDialog } from "@/components/ProjectCreateDialog";
+import { GanttChart } from "@/components/GanttChart";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
@@ -16,6 +17,7 @@ export default function Projects() {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [detailSheetOpen, setDetailSheetOpen] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [showGantt, setShowGantt] = useState(false);
   const { toast } = useToast();
 
   const { data: projects = [], isLoading: projectsLoading, error: projectsError } = useQuery<ProjectWithStages[]>({
@@ -26,13 +28,15 @@ export default function Projects() {
     queryKey: ["/api/users"],
   });
 
-  if (projectsError) {
-    toast({
-      title: "Ошибка загрузки",
-      description: "Не удалось загрузить проекты",
-      variant: "destructive",
-    });
-  }
+  useEffect(() => {
+    if (projectsError) {
+      toast({
+        title: "Ошибка загрузки",
+        description: "Не удалось загрузить проекты",
+        variant: "destructive",
+      });
+    }
+  }, [projectsError, toast]);
 
   const isLoading = projectsLoading || usersLoading;
 
@@ -85,6 +89,7 @@ export default function Projects() {
             variant="outline" 
             size="icon"
             className="md:hidden"
+            onClick={() => setShowGantt(!showGantt)}
             data-testid="button-view-gantt"
           >
             <Calendar className="h-4 w-4" />
@@ -92,10 +97,11 @@ export default function Projects() {
           <Button 
             variant="outline" 
             className="hidden md:flex"
+            onClick={() => setShowGantt(!showGantt)}
             data-testid="button-view-gantt-desktop"
           >
             <Calendar className="h-4 w-4 mr-2" />
-            Диаграмма Ганта
+            {showGantt ? "Список проектов" : "Диаграмма Ганта"}
           </Button>
           <Button 
             size="icon"
@@ -116,6 +122,12 @@ export default function Projects() {
         </div>
       </div>
 
+      {showGantt ? (
+        <div className="mt-6" data-testid="gantt-view">
+          <GanttChart stages={projects.flatMap(p => p.stages)} />
+        </div>
+      ) : (
+      <>
       <Tabs defaultValue="all" className="w-full">
         <TabsList className="overflow-x-auto">
           <TabsTrigger value="all">Все ({transformedProjects.length})</TabsTrigger>
@@ -209,6 +221,8 @@ export default function Projects() {
         open={createDialogOpen}
         onOpenChange={setCreateDialogOpen}
       />
+      </>
+      )}
     </div>
   );
 }
