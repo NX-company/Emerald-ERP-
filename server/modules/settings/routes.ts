@@ -10,13 +10,18 @@ export const router = Router();
 // GET /api/settings/company - Get company settings
 router.get("/api/settings/company", async (req, res) => {
   try {
-    const settings = await settingsRepository.getCompanySettings();
-    
+    let settings = await settingsRepository.getCompanySettings();
+
+    // Create default settings if they don't exist
     if (!settings) {
-      res.status(404).json({ error: "Company settings not found" });
-      return;
+      settings = await settingsRepository.updateCompanySettings({
+        company_name: "Мебельная фабрика Emerald",
+        inn: "",
+        address: "",
+        phone: "",
+      });
     }
-    
+
     res.json(settings);
   } catch (error) {
     console.error("Error fetching company settings:", error);

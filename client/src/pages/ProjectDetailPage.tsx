@@ -19,6 +19,7 @@ import { StageFlowEditor } from "@/components/StageFlowEditor";
 import { StatusBadge } from "@/components/StatusBadge";
 import { GanttChart } from "@/components/GanttChart";
 import { ProjectTimeline } from "@/components/ProjectTimeline";
+import { ProjectBusinessProcesses } from "@/components/ProjectBusinessProcesses";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Project, ProjectItem, ProjectStage, User } from "@shared/schema";
@@ -417,7 +418,11 @@ export default function ProjectDetailPage() {
           Назад к проектам
         </Button>
 
-        <Card className="p-6">
+        <Card className={`p-6 border-l-4 ${
+          project.status === 'completed' ? 'border-green-500 bg-green-50/50 dark:bg-green-950/20' :
+          project.status === 'in_progress' ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-950/20' :
+          'border-gray-400 bg-accent/30'
+        }`}>
           <div className="space-y-4">
             <div className="flex items-start justify-between flex-wrap gap-4">
               <div className="space-y-2">
@@ -429,10 +434,24 @@ export default function ProjectDetailPage() {
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <StatusBadge status={project.status} data-testid="badge-status" />
+                <Badge
+                  variant="outline"
+                  className={`${
+                    project.status === 'in_progress'
+                      ? 'bg-blue-500/10 text-blue-600 border-blue-500/20'
+                      : project.status === 'completed'
+                      ? 'bg-green-500/10 text-green-600 border-green-500/20'
+                      : 'bg-gray-500/10 text-gray-600 border-gray-500/20'
+                  }`}
+                  data-testid="badge-status"
+                >
+                  {project.status === 'in_progress' && '🔵 В работе'}
+                  {project.status === 'completed' && '🟢 Завершён'}
+                  {project.status === 'pending' && '⚪ Ожидает'}
+                </Badge>
                 {!project.started_at && project.status === "pending" && (
-                  <Button 
-                    onClick={() => startProjectMutation.mutate()} 
+                  <Button
+                    onClick={() => startProjectMutation.mutate()}
                     disabled={startProjectMutation.isPending}
                     data-testid="button-start-project"
                   >
@@ -445,28 +464,93 @@ export default function ProjectDetailPage() {
 
             <Separator />
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">Длительность</p>
-                <div className="flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-muted-foreground" />
-                  <p className="text-sm" data-testid="text-duration">
-                    {project.duration_days || 0} дн.
-                  </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+              {/* Дата начала */}
+              {project.started_at && (
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Дата начала</p>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-muted-foreground" />
+                    <p className="text-sm font-medium" data-testid="text-start-date">
+                      {new Date(project.started_at).toLocaleDateString('ru-RU')}
+                    </p>
+                  </div>
                 </div>
-              </div>
+              )}
 
+              {/* Финальный дедлайн */}
+              {project.started_at && project.duration_days && (
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Финальный срок</p>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-muted-foreground" />
+                    <p className="text-sm font-medium" data-testid="text-final-deadline">
+                      {(() => {
+                        const deadline = new Date(project.started_at);
+                        deadline.setDate(deadline.getDate() + (project.duration_days || 0));
+                        return deadline.toLocaleDateString('ru-RU');
+                      })()}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Осталось дней */}
+              {project.started_at && project.duration_days && project.status !== 'completed' && (
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Осталось дней</p>
+                  {(() => {
+                    const startDate = new Date(project.started_at);
+                    const today = new Date();
+                    const elapsedDays = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+                    const remaining = (project.duration_days || 0) - elapsedDays;
+                    const isOverdue = remaining < 0;
+
+                    return (
+                      <div className={`flex items-center gap-2 px-3 py-2 rounded-md ${
+                        isOverdue
+                          ? 'bg-red-500/10 text-red-600 border border-red-500/20'
+                          : remaining < 3
+                          ? 'bg-orange-500/10 text-orange-600 border border-orange-500/20'
+                          : 'bg-primary/10 border border-primary/20'
+                      }`}>
+                        {isOverdue ? <AlertCircle className="w-4 h-4" /> : <Calendar className="w-4 h-4" />}
+                        <p className="text-sm font-bold" data-testid="text-days-remaining">
+                          {isOverdue ? `Просрочено: +${Math.abs(remaining)} дн.` : `${remaining} дн.`}
+                        </p>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {!project.started_at && (
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Длительность</p>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-muted-foreground" />
+                    <p className="text-sm" data-testid="text-duration">
+                      {project.duration_days || 0} дн.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Прогресс */}
               <div className="space-y-1">
                 <p className="text-sm text-muted-foreground">Прогресс</p>
                 <div className="space-y-2">
                   <Progress value={project.progress || 0} data-testid="progress-bar" />
-                  <p className="text-sm" data-testid="text-progress">
+                  <p className="text-sm font-medium" data-testid="text-progress">
                     {project.progress || 0}%
                   </p>
                 </div>
               </div>
+            </div>
 
-              <div className="space-y-1">
+            {/* Позиций мебели - отдельной строкой */}
+            <div className="pt-3 border-t">
+              <div className="flex items-center justify-between">
                 <p className="text-sm text-muted-foreground">Позиций мебели</p>
                 <p className="text-lg font-semibold" data-testid="text-items-count">
                   {items.length}
@@ -618,8 +702,8 @@ export default function ProjectDetailPage() {
               <TabsTrigger value="gantt" data-testid="tab-gantt">
                 Диаграмма Ганта
               </TabsTrigger>
-              <TabsTrigger value="templates" data-testid="tab-templates">
-                Шаблоны
+              <TabsTrigger value="processes" data-testid="tab-processes">
+                Бизнес-процессы
               </TabsTrigger>
             </TabsList>
 
@@ -642,16 +726,11 @@ export default function ProjectDetailPage() {
 
             <TabsContent value="gantt" className="mt-6 space-y-4" data-testid="content-gantt">
               <ProjectTimeline projectId={id!} />
-              <GanttChart stages={project?.stages || []} />
+              <GanttChart stages={project?.stages || []} projectId={id} />
             </TabsContent>
 
-            <TabsContent value="templates" className="mt-6" data-testid="content-templates">
-              <div className="text-center py-12 space-y-2">
-                <FileText className="w-12 h-12 mx-auto text-muted-foreground" />
-                <p className="text-sm text-muted-foreground" data-testid="text-templates-placeholder">
-                  Шаблоны процессов будут добавлены в следующей версии
-                </p>
-              </div>
+            <TabsContent value="processes" className="mt-6" data-testid="content-processes">
+              <ProjectBusinessProcesses projectId={id!} />
             </TabsContent>
           </Tabs>
         </Card>

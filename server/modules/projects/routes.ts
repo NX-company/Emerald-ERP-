@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { projectsRepository } from "./repository";
-import { 
+import {
   insertProjectSchema, insertProjectStageSchema, insertProjectItemSchema,
   insertStageDependencySchema, insertProcessTemplateSchema, insertTemplateStageSchema,
   insertTemplateDependencySchema, insertStageMessageSchema, project_stages
@@ -10,6 +10,7 @@ import { salesRepository } from "../sales/repository";
 import { z } from "zod";
 import { db } from "../../db";
 import { eq } from "drizzle-orm";
+import { activityLogsRepository } from "../tasks/repository";
 
 export const router = Router();
 
@@ -99,6 +100,10 @@ router.post("/api/projects/from-invoice", async (req, res) => {
           id: z.string(),
           name: z.string(),
           order_index: z.number(),
+          duration_days: z.number().optional(),
+          assignee_id: z.string().optional(),
+          cost: z.number().optional(),
+          description: z.string().optional(),
         })),
         dependencies: z.array(z.object({
           stage_id: z.string(),
@@ -135,20 +140,80 @@ router.post("/api/projects/from-invoice", async (req, res) => {
     }
 
     const existingProject = await projectsRepository.getProjectByDealId(dealId);
-    if (existingProject) {
-      res.status(400).json({ error: "Project already exists for this deal" });
+    const userId = req.headers["x-user-id"] as string;
+
+    // If project exists and positionStagesData is provided, update the stages
+    if (existingProject && positionStagesData) {
+      console.log("Project exists, updating stages...");
+
+      // Delete old stages for the affected positions and create new ones
+      for (const [positionIndexStr, stageData] of Object.entries(positionStagesData)) {
+        const positionIndex = parseInt(positionIndexStr);
+
+        // Get items (positions) for this project to find the correct item_id
+        const items = await projectsRepository.getProjectItems(existingProject.id);
+        if (items && items.length > positionIndex) {
+          const item = items[positionIndex];
+
+          // Delete old stages for this item
+          const oldStages = await projectsRepository.getProjectStages(existingProject.id);
+          const stagesToDelete = oldStages.filter(s => s.item_id === item.id);
+
+          for (const stage of stagesToDelete) {
+            await projectsRepository.deleteProjectStage(stage.id);
+          }
+
+          // Create new stages
+          if (stageData.stages && stageData.stages.length > 0) {
+            await projectsRepository.createStagesWithDependencies(
+              existingProject.id,
+              item.id,
+              stageData.stages,
+              stageData.dependencies || []
+            );
+          }
+        }
+      }
+
+      // Log activity
+      await activityLogsRepository.logActivity({
+        entity_type: "deal",
+        entity_id: dealId,
+        action_type: "updated",
+        user_id: userId,
+        description: `Обновлены этапы проекта "${existingProject.name}"`,
+      });
+
+      res.status(200).json(existingProject);
       return;
     }
 
+    // If project exists but no stages data provided, just return existing project
+    if (existingProject) {
+      res.status(200).json(existingProject);
+      return;
+    }
+
+    // Create new project
     const project = await projectsRepository.createProjectFromInvoice(
-      dealId, 
-      invoiceId, 
-      deal, 
+      dealId,
+      invoiceId,
+      deal,
       invoice,
       selectedPositions,
       editedPositions,
       positionStagesData
     );
+
+    // Log activity
+    await activityLogsRepository.logActivity({
+      entity_type: "deal",
+      entity_id: dealId,
+      action_type: "created",
+      user_id: userId,
+      description: `Создан проект "${project.name}" из ${invoice.document_type === 'invoice' ? 'счета' : 'КП'}`,
+    });
+
     res.status(201).json(project);
   } catch (error) {
     console.error("Error creating project from invoice:", error);

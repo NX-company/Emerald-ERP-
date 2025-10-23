@@ -1,61 +1,100 @@
 import { Router } from "express";
+import multer from "multer";
 import { attachmentsRepository } from "./repository";
 import { salesRepository } from "../sales/repository";
 import { insertDealAttachmentSchema } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
 import { ObjectStorageService, ObjectNotFoundError } from "../../objectStorage";
 import { ObjectPermission } from "../../objectAcl";
+import { localFileStorage } from "../../localFileStorage";
+import { activityLogsRepository } from "../tasks/repository";
 
 export const router = Router();
 
-// POST /api/objects/upload - получение presigned URL для загрузки
-router.post("/api/objects/upload", async (req, res) => {
+// Configure multer for memory storage with 500MB limit
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 524288000, // 500MB limit
+  },
+});
+
+// POST /api/objects/upload - direct file upload to local storage
+router.post("/api/objects/upload", (req, res, next) => {
+  upload.single("file")(req, res, (err) => {
+    if (err) {
+      // Multer error handling
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({
+          error: `File too large. Maximum size is 50MB. Please reduce file size and try again.`
+        });
+      }
+      console.error("Multer error:", err);
+      return res.status(400).json({ error: err.message || "Failed to upload file" });
+    }
+    next();
+  });
+}, async (req, res) => {
+  try {
+    console.log('[Upload] POST /api/objects/upload - Starting upload');
+    const userId = req.headers["x-user-id"] as string;
+
+    if (!userId) {
+      console.log('[Upload] No user ID in headers');
+      return res.status(401).json({ error: "User not authenticated" });
+    }
+
+    console.log('[Upload] User ID:', userId);
+
+    if (!req.file) {
+      console.log('[Upload] No file in request');
+      return res.status(400).json({ error: "No file uploaded" });
+    }
+
+    console.log('[Upload] Received file:', {
+      originalname: req.file.originalname,
+      size: req.file.size,
+      mimetype: req.file.mimetype
+    });
+
+    // Save file to local storage
+    const objectPath = await localFileStorage.saveFile(req.file.buffer, req.file.originalname);
+
+    console.log(`✅ [Upload] File saved successfully: ${req.file.originalname} -> ${objectPath}`);
+
+    // Return objectPath for metadata storage
+    const response = {
+      objectPath,
+      fileName: req.file.originalname,
+      fileSize: req.file.size,
+      mimeType: req.file.mimetype
+    };
+
+    console.log('[Upload] Returning response:', response);
+
+    res.json(response);
+  } catch (error) {
+    console.error("[Upload] Error uploading file:", error);
+    res.status(500).json({ error: "Failed to upload file" });
+  }
+});
+
+// GET /objects/:objectPath(*) - скачивание файла из локального хранилища
+router.get("/objects/:objectPath(*)", async (req, res) => {
   try {
     const userId = req.headers["x-user-id"] as string;
-    
+
     if (!userId) {
       return res.status(401).json({ error: "User not authenticated" });
     }
 
-    const objectStorageService = new ObjectStorageService();
-    const result = await objectStorageService.getObjectEntityUploadURL();
-    
-    // Return both uploadURL for client upload and objectPath for metadata storage
-    res.json({ 
-      uploadURL: result.uploadURL,
-      objectPath: result.objectPath 
-    });
-  } catch (error) {
-    console.error("Error getting upload URL:", error);
-    res.status(500).json({ error: "Failed to get upload URL" });
-  }
-});
-
-// GET /objects/:objectPath(*) - скачивание файла с ACL проверкой
-router.get("/objects/:objectPath(*)", async (req, res) => {
-  try {
-    const userId = req.headers["x-user-id"] as string;
-    const objectStorageService = new ObjectStorageService();
-    
-    const objectFile = await objectStorageService.getObjectEntityFile(req.path);
-    
-    const canAccess = await objectStorageService.canAccessObjectEntity({
-      objectFile,
-      userId: userId,
-      requestedPermission: ObjectPermission.READ,
-    });
-    
-    if (!canAccess) {
-      return res.status(403).json({ error: "Access denied" });
-    }
-    
-    objectStorageService.downloadObject(objectFile, res);
+    // Download file from local storage
+    await localFileStorage.downloadFile(req.path, res);
   } catch (error) {
     console.error("Error downloading object:", error);
-    if (error instanceof ObjectNotFoundError) {
-      return res.status(404).json({ error: "File not found" });
+    if (!res.headersSent) {
+      return res.status(500).json({ error: "Failed to download file" });
     }
-    return res.status(500).json({ error: "Failed to download file" });
   }
 });
 
@@ -64,7 +103,7 @@ router.post("/api/deals/:dealId/attachments", async (req, res) => {
   try {
     const { dealId } = req.params;
     const userId = req.headers["x-user-id"] as string;
-    
+
     if (!userId) {
       return res.status(401).json({ error: "User not authenticated" });
     }
@@ -87,29 +126,28 @@ router.post("/api/deals/:dealId/attachments", async (req, res) => {
       return res.status(400).json({ error: errorMessage });
     }
 
-    // Устанавливаем ACL политику для файла
-    const objectStorageService = new ObjectStorageService();
-    
     if (!req.body.file_path) {
       return res.status(400).json({ error: "file_path is required" });
     }
 
-    const objectPath = await objectStorageService.trySetObjectEntityAclPolicy(
-      req.body.file_path,
-      {
-        owner: userId,
-        visibility: "private",
-      }
-    );
+    // Verify file exists in local storage
+    const { exists } = await localFileStorage.getFile(req.body.file_path);
+    if (!exists) {
+      return res.status(404).json({ error: "Uploaded file not found" });
+    }
 
     // Сохраняем метаданные в БД
-    const attachmentData = {
-      ...validationResult.data,
-      file_path: objectPath,
-    };
+    const newAttachment = await attachmentsRepository.createDealAttachment(validationResult.data);
 
-    const newAttachment = await attachmentsRepository.createDealAttachment(attachmentData);
-    
+    // Log activity
+    await activityLogsRepository.logActivity({
+      entity_type: "deal",
+      entity_id: dealId,
+      action_type: "created",
+      user_id: userId,
+      description: `Добавлено вложение: ${newAttachment.file_name}`,
+    });
+
     res.status(201).json(newAttachment);
   } catch (error) {
     console.error("Error creating deal attachment:", error);
@@ -164,13 +202,28 @@ router.delete("/api/deals/:dealId/attachments/:id", async (req, res) => {
 
     // Удаляем запись из БД
     const deleted = await attachmentsRepository.deleteDealAttachment(id);
-    
+
     if (!deleted) {
       return res.status(404).json({ error: "Attachment not found" });
     }
 
-    // Примечание: физическое удаление файла из object storage можно добавить здесь при необходимости
-    
+    // Log activity
+    await activityLogsRepository.logActivity({
+      entity_type: "deal",
+      entity_id: dealId,
+      action_type: "deleted",
+      user_id: userId,
+      description: `Удалено вложение: ${attachment.file_name}`,
+    });
+
+    // Удаляем физический файл из локального хранилища
+    try {
+      await localFileStorage.deleteFile(attachment.file_path);
+    } catch (error) {
+      console.warn("Failed to delete physical file:", error);
+      // Continue even if file deletion fails
+    }
+
     res.status(204).send();
   } catch (error) {
     console.error("Error deleting deal attachment:", error);

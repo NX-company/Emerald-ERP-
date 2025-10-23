@@ -1,105 +1,101 @@
 import { Router } from "express";
-import { tasksRepository } from "./repository";
-import { insertTaskSchema } from "@shared/schema";
-import { fromZodError } from "zod-validation-error";
+import { tasksRepository, activityLogsRepository } from "./repository";
+import { insertTaskSchema, insertActivityLogSchema } from "@shared/schema";
 
 export const router = Router();
 
-// ========== Task Endpoints ==========
-
-// GET /api/tasks - Get all tasks
-router.get("/api/tasks", async (req, res) => {
+// Get all tasks
+router.get("/api/tasks", async (_req, res) => {
   try {
-    const { status, priority, assignee_id } = req.query;
-    const tasks = await tasksRepository.getAllTasks(
-      status as string | undefined,
-      priority as string | undefined,
-      assignee_id as string | undefined
-    );
+    const tasks = await tasksRepository.getAllTasks();
     res.json(tasks);
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error fetching tasks:", error);
     res.status(500).json({ error: "Failed to fetch tasks" });
   }
 });
 
-// GET /api/tasks/:id - Get task by ID
-router.get("/api/tasks/:id", async (req, res) => {
+// Get tasks by entity (deal, project, etc.)
+router.get("/api/tasks/entity/:entityType/:entityId", async (req, res) => {
   try {
-    const { id } = req.params;
-    const task = await tasksRepository.getTaskById(id);
-    
-    if (!task) {
-      res.status(404).json({ error: "Task not found" });
-      return;
-    }
-    
-    res.json(task);
-  } catch (error) {
-    console.error("Error fetching task:", error);
-    res.status(500).json({ error: "Failed to fetch task" });
+    const { entityType, entityId } = req.params;
+    const tasks = await tasksRepository.getTasksByEntity(entityType, entityId);
+    res.json(tasks);
+  } catch (error: any) {
+    console.error("Error fetching tasks by entity:", error);
+    res.status(500).json({ error: "Failed to fetch tasks" });
   }
 });
 
-// POST /api/tasks - Create new task
+// Create task
 router.post("/api/tasks", async (req, res) => {
   try {
-    const validationResult = insertTaskSchema.safeParse(req.body);
-    
-    if (!validationResult.success) {
-      const errorMessage = fromZodError(validationResult.error).toString();
-      res.status(400).json({ error: errorMessage });
-      return;
+    const validatedData = insertTaskSchema.parse(req.body);
+    const task = await tasksRepository.createTask(validatedData);
+
+    // Log activity
+    if (validatedData.related_entity_type && validatedData.related_entity_id) {
+      await activityLogsRepository.logActivity({
+        entity_type: validatedData.related_entity_type,
+        entity_id: validatedData.related_entity_id,
+        action_type: "task_created",
+        user_id: validatedData.created_by,
+        description: `!>740=0 7040G0: ${validatedData.title}`,
+      });
     }
-    
-    const newTask = await tasksRepository.createTask(validationResult.data);
-    res.status(201).json(newTask);
-  } catch (error) {
+
+    res.status(201).json(task);
+  } catch (error: any) {
     console.error("Error creating task:", error);
-    res.status(500).json({ error: "Failed to create task" });
+    res.status(400).json({ error: error.message || "Failed to create task" });
   }
 });
 
-// PUT /api/tasks/:id - Update task
+// Update task
 router.put("/api/tasks/:id", async (req, res) => {
   try {
-    const { id } = req.params;
-    const validationResult = insertTaskSchema.partial().safeParse(req.body);
-    
-    if (!validationResult.success) {
-      const errorMessage = fromZodError(validationResult.error).toString();
-      res.status(400).json({ error: errorMessage });
-      return;
+    const task = await tasksRepository.updateTask(req.params.id, req.body);
+
+    // Log activity if status changed
+    if (req.body.status && task.related_entity_type && task.related_entity_id) {
+      await activityLogsRepository.logActivity({
+        entity_type: task.related_entity_type,
+        entity_id: task.related_entity_id,
+        action_type: "task_status_changed",
+        user_id: req.body.updated_by || task.assignee_id,
+        field_changed: "status",
+        new_value: req.body.status,
+        description: `040G0 "${task.title}" 87<5=8;0 AB0BCA =0: ${req.body.status}`,
+      });
     }
-    
-    const updatedTask = await tasksRepository.updateTask(id, validationResult.data);
-    
-    if (!updatedTask) {
-      res.status(404).json({ error: "Task not found" });
-      return;
-    }
-    
-    res.json(updatedTask);
-  } catch (error) {
+
+    res.json(task);
+  } catch (error: any) {
     console.error("Error updating task:", error);
     res.status(500).json({ error: "Failed to update task" });
   }
 });
 
-// DELETE /api/tasks/:id - Delete task
-router.delete("/api/tasks/:id", async (req, res) => {
+// Get activity logs for an entity
+router.get("/api/activity-logs/:entityType/:entityId", async (req, res) => {
   try {
-    const { id } = req.params;
-    const deleted = await tasksRepository.deleteTask(id);
-    
-    if (!deleted) {
-      res.status(404).json({ error: "Task not found" });
-      return;
-    }
-    
-    res.status(204).send();
-  } catch (error) {
-    console.error("Error deleting task:", error);
-    res.status(500).json({ error: "Failed to delete task" });
+    const { entityType, entityId } = req.params;
+    const logs = await activityLogsRepository.getActivityLogs(entityType, entityId);
+    res.json(logs);
+  } catch (error: any) {
+    console.error("Error fetching activity logs:", error);
+    res.status(500).json({ error: "Failed to fetch activity logs" });
+  }
+});
+
+// Create activity log
+router.post("/api/activity-logs", async (req, res) => {
+  try {
+    const validatedData = insertActivityLogSchema.parse(req.body);
+    const log = await activityLogsRepository.logActivity(validatedData);
+    res.status(201).json(log);
+  } catch (error: any) {
+    console.error("Error creating activity log:", error);
+    res.status(400).json({ error: error.message || "Failed to create activity log" });
   }
 });

@@ -37,7 +37,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { X, Plus, Loader2 } from "lucide-react";
+import { X, Plus, Loader2, User as UserIcon } from "lucide-react";
 import { insertDealSchema, type Deal, type User } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -98,6 +98,7 @@ export function DealDetailSheet({ deal, open, onOpenChange }: DealDetailSheetPro
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/deals"] });
+      queryClient.invalidateQueries({ queryKey: ['/api/activity-logs', 'deal', deal?.id] });
       toast({
         title: "Успешно",
         description: "Сделка обновлена",
@@ -174,6 +175,16 @@ export function DealDetailSheet({ deal, open, onOpenChange }: DealDetailSheetPro
             <SheetDescription data-testid="text-sheet-description">
               Редактирование информации о сделке
             </SheetDescription>
+            {deal && (deal as any).manager_user && (
+              <div className="flex items-center gap-2 pt-2 text-sm text-muted-foreground">
+                <UserIcon className="h-4 w-4" />
+                <span>
+                  Менеджер: <span className="font-medium text-foreground">
+                    {(deal as any).manager_user.full_name || (deal as any).manager_user.username}
+                  </span>
+                </span>
+              </div>
+            )}
           </SheetHeader>
 
           <Form {...form}>

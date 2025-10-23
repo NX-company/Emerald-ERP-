@@ -49,26 +49,18 @@ export function DealCreateDialog({ open, onOpenChange }: DealCreateDialogProps) 
     resolver: zodResolver(insertDealSchema),
     defaultValues: {
       client_name: "",
-      company: "",
-      amount: "",
+      company: null,
+      amount: null,
       stage: "new" as const,
-      manager_id: "",
-      production_days_count: undefined,
+      manager_id: null,
+      production_days_count: null,
       tags: [] as string[],
     },
   });
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
-      const dealData = {
-        ...data,
-        amount: data.amount || null,
-        company: data.company || null,
-        manager_id: data.manager_id || null,
-        production_days_count: data.production_days_count || null,
-        tags: data.tags.length > 0 ? data.tags : null,
-      };
-      await apiRequest("POST", "/api/deals", dealData);
+      await apiRequest("POST", "/api/deals", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/deals"] });

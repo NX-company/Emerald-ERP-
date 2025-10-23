@@ -1,27 +1,71 @@
 import { db } from "../../db";
 import { eq, asc, desc, sql, inArray } from "drizzle-orm";
-import type { Deal, InsertDeal, DealStage, InsertDealStage, DealMessage, InsertDealMessage, DealDocument, InsertDealDocument } from "@shared/schema";
-import { deals, dealStages, deal_messages, deal_documents } from "@shared/schema";
+import type { Deal, InsertDeal, DealStage, InsertDealStage, DealMessage, InsertDealMessage, DealDocument, InsertDealDocument, DealAttachment, InsertDealAttachment } from "@shared/schema";
+import { deals, dealStages, deal_messages, deal_documents, deal_attachments, users } from "@shared/schema";
 
 export class SalesRepository {
-  async getAllDeals(): Promise<Deal[]> {
-    return await db.select().from(deals);
+  async getAllDeals(): Promise<any[]> {
+    const result = await db
+      .select()
+      .from(deals)
+      .leftJoin(users, eq(deals.manager_id, users.id));
+
+    return result.map(r => ({
+      ...r.deals,
+      manager_user: r.users ? {
+        id: r.users.id,
+        username: r.users.username,
+        full_name: r.users.full_name,
+        email: r.users.email,
+      } : null,
+    }));
   }
 
-  async getDealById(id: string): Promise<Deal | undefined> {
-    const result = await db.select().from(deals).where(eq(deals.id, id));
-    return result[0];
+  async getDealById(id: string): Promise<any | undefined> {
+    const result = await db
+      .select()
+      .from(deals)
+      .leftJoin(users, eq(deals.manager_id, users.id))
+      .where(eq(deals.id, id));
+
+    if (!result[0]) return undefined;
+
+    return {
+      ...result[0].deals,
+      manager_user: result[0].users ? {
+        id: result[0].users.id,
+        username: result[0].users.username,
+        full_name: result[0].users.full_name,
+        email: result[0].users.email,
+      } : null,
+    };
   }
 
   async getNextOrderNumber(): Promise<string> {
-    const result = await db.select({ 
-      maxOrderNumber: sql<string>`COALESCE(MAX(CAST(order_number AS INTEGER)), 0)` 
-    })
-    .from(deals)
-    .where(sql`order_number ~ '^[0-9]+$'`);
-    
-    const maxNumber = parseInt(result[0]?.maxOrderNumber || "0");
-    return String(maxNumber + 1);
+    // Generate order number in format: ORD-YYYY-MM-NNNNN
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const prefix = `ORD-${year}-${month}-`;
+
+    // Get all deals with current month prefix
+    const allDeals = await db.select({ order_number: deals.order_number }).from(deals);
+
+    const currentMonthNumbers = allDeals
+      .map(d => d.order_number)
+      .filter(n => n && n.startsWith(prefix))
+      .map(n => {
+        const parts = n!.split('-');
+        return parts.length === 4 ? parseInt(parts[3]) : 0;
+      })
+      .filter(n => !isNaN(n));
+
+    const maxNumber = currentMonthNumbers.length > 0
+      ? Math.max(...currentMonthNumbers)
+      : 0;
+
+    const nextNumber = String(maxNumber + 1).padStart(5, '0');
+    return `${prefix}${nextNumber}`;
   }
 
   async createDeal(data: InsertDeal): Promise<Deal> {
@@ -109,12 +153,22 @@ export class SalesRepository {
     );
   }
 
-  async getDealMessages(dealId: string): Promise<DealMessage[]> {
-    return await db
+  async getDealMessages(dealId: string): Promise<any[]> {
+    const result = await db
       .select()
       .from(deal_messages)
+      .leftJoin(users, eq(deal_messages.author_id, users.id))
       .where(eq(deal_messages.deal_id, dealId))
       .orderBy(desc(deal_messages.created_at));
+
+    return result.map(r => ({
+      ...r.deal_messages,
+      author: r.users ? {
+        id: r.users.id,
+        username: r.users.username,
+        full_name: r.users.full_name,
+      } : null,
+    }));
   }
 
   async createDealMessage(data: InsertDealMessage): Promise<DealMessage> {
@@ -160,6 +214,43 @@ export class SalesRepository {
 
   async deleteDealDocument(id: string): Promise<void> {
     await db.delete(deal_documents).where(eq(deal_documents.id, id));
+  }
+
+  async getDealDocument(id: string): Promise<DealDocument | undefined> {
+    const [document] = await db
+      .select()
+      .from(deal_documents)
+      .where(eq(deal_documents.id, id));
+    return document;
+  }
+
+  // Document Attachments
+  async getDocumentAttachments(documentId: string): Promise<DealAttachment[]> {
+    return await db
+      .select()
+      .from(deal_attachments)
+      .where(eq(deal_attachments.document_id, documentId))
+      .orderBy(desc(deal_attachments.created_at));
+  }
+
+  async createDocumentAttachment(data: InsertDealAttachment): Promise<DealAttachment> {
+    const [attachment] = await db
+      .insert(deal_attachments)
+      .values(data)
+      .returning();
+    return attachment;
+  }
+
+  async getAttachmentById(id: string): Promise<DealAttachment | undefined> {
+    const [attachment] = await db
+      .select()
+      .from(deal_attachments)
+      .where(eq(deal_attachments.id, id));
+    return attachment;
+  }
+
+  async deleteAttachment(id: string): Promise<void> {
+    await db.delete(deal_attachments).where(eq(deal_attachments.id, id));
   }
 }
 

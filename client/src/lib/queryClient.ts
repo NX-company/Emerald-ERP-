@@ -2,11 +2,18 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
 export function getCurrentUserId(): string {
   const storedUserId = localStorage.getItem("currentUserId");
+  const defaultUserId = "QHu1kUFKhu8baYbodQZ5Q";
+
+  // Migrate old PostgreSQL UUID to new SQLite ID
+  if (storedUserId === "c2fdd40b-dadf-4fbb-848a-74283d14802e") {
+    localStorage.setItem("currentUserId", defaultUserId);
+    return defaultUserId;
+  }
+
   if (storedUserId) {
     return storedUserId;
   }
-  
-  const defaultUserId = "c2fdd40b-dadf-4fbb-848a-74283d14802e";
+
   localStorage.setItem("currentUserId", defaultUserId);
   return defaultUserId;
 }
@@ -22,19 +29,19 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
-export async function apiRequest(
+export async function apiRequest<T = any>(
   method: string,
   url: string,
   data?: unknown | undefined,
-): Promise<Response> {
+): Promise<T> {
   const headers: Record<string, string> = {
     "X-User-Id": getCurrentUserId(),
   };
-  
+
   if (data) {
     headers["Content-Type"] = "application/json";
   }
-  
+
   const res = await fetch(url, {
     method,
     headers,
@@ -43,7 +50,14 @@ export async function apiRequest(
   });
 
   await throwIfResNotOk(res);
-  return res;
+
+  // For DELETE requests, return null (no content expected)
+  if (method === 'DELETE' && res.status === 204) {
+    return null as T;
+  }
+
+  // For all other requests, parse and return JSON
+  return await res.json();
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";

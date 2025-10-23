@@ -59,17 +59,40 @@ export class UsersRepository {
     return result.length > 0;
   }
 
-  async updateUserPermissions(
-    id: string, 
-    permissions: {
-      can_create_deals?: boolean;
-      can_edit_deals?: boolean;
-      can_delete_deals?: boolean;
-    }
-  ): Promise<User | undefined> {
+  async getUsersWithRoles(): Promise<Array<User & { role?: any }>> {
+    const allUsers = await this.getAllUsers();
+    const { roles } = await import("@shared/schema");
+
+    const usersWithRoles = await Promise.all(
+      allUsers.map(async (user) => {
+        if (!user.role_id) {
+          return { ...user, role: null };
+        }
+        const roleResult = await db.select().from(roles).where(eq(roles.id, user.role_id));
+        return {
+          ...user,
+          role: roleResult[0] || null,
+        };
+      })
+    );
+
+    return usersWithRoles;
+  }
+
+  async assignRole(userId: string, roleId: string | null): Promise<User | undefined> {
     const result = await db.update(users)
-      .set(permissions)
-      .where(eq(users.id, id))
+      .set({ role_id: roleId, updated_at: new Date() })
+      .where(eq(users.id, userId))
+      .returning();
+    if (!result[0]) return undefined;
+    const { password, ...userWithoutPassword } = result[0];
+    return userWithoutPassword;
+  }
+
+  async setUserStatus(userId: string, isActive: boolean): Promise<User | undefined> {
+    const result = await db.update(users)
+      .set({ is_active: isActive, updated_at: new Date() })
+      .where(eq(users.id, userId))
       .returning();
     if (!result[0]) return undefined;
     const { password, ...userWithoutPassword } = result[0];

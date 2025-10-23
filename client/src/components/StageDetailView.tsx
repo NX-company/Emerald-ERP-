@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Calendar, DollarSign, Send, Paperclip, FileText, Download, Play, CheckCircle } from "lucide-react";
+import { Calendar, DollarSign, Send, Paperclip, FileText, Download, Play, CheckCircle, Upload, Image, FileSpreadsheet, File, Link2, TrendingUp } from "lucide-react";
 import type { ProjectStage } from "@shared/schema";
 
 interface StageDetailViewProps {
@@ -56,6 +56,28 @@ export function StageDetailView({
     queryKey: ["/api/projects", projectId, "documents"],
     enabled: !!projectId,
   });
+
+  // Получаем зависимости этапов
+  const { data: dependencies = [] } = useQuery<any[]>({
+    queryKey: ['/api/projects', projectId, 'dependencies'],
+    enabled: !!projectId,
+  });
+
+  // Получаем все этапы проекта для отображения названий
+  const { data: allStages = [] } = useQuery<ProjectStage[]>({
+    queryKey: ['/api/projects', projectId, 'stages'],
+    enabled: !!projectId,
+  });
+
+  // Находим зависимости текущего этапа
+  const stageDependencies = dependencies.filter(d => d.dependent_stage_id === stageId);
+  const dependentStages = dependencies.filter(d => d.depends_on_stage_id === stageId);
+
+  // Функция для получения названия этапа по ID
+  const getStageName = (id: string) => {
+    const stage = allStages.find(s => s.id === id);
+    return stage?.name || 'Неизвестный этап';
+  };
 
   const createMessageMutation = useMutation({
     mutationFn: async (message: string) => {
@@ -222,9 +244,37 @@ export function StageDetailView({
     setIsDragging(false);
   };
 
+  // Определение иконки файла по расширению
+  const getFileIcon = (fileName: string) => {
+    const ext = fileName.split('.').pop()?.toLowerCase();
+    switch (ext) {
+      case 'jpg':
+      case 'jpeg':
+      case 'png':
+      case 'gif':
+      case 'svg':
+        return <Image className="w-4 h-4 text-blue-500" />;
+      case 'pdf':
+        return <FileText className="w-4 h-4 text-red-500" />;
+      case 'xlsx':
+      case 'xls':
+      case 'csv':
+        return <FileSpreadsheet className="w-4 h-4 text-green-500" />;
+      case 'doc':
+      case 'docx':
+        return <FileText className="w-4 h-4 text-blue-600" />;
+      default:
+        return <File className="w-4 h-4 text-muted-foreground" />;
+    }
+  };
+
   return (
     <div className="space-y-4">
-      <Card>
+      <Card className={`border-l-4 ${
+        currentStatus === 'completed' ? 'border-green-500 bg-green-50/30 dark:bg-green-950/20' :
+        currentStatus === 'in_progress' ? 'border-blue-500 bg-blue-50/30 dark:bg-blue-950/20' :
+        'border-gray-400 bg-accent/30'
+      }`}>
         <CardHeader>
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
@@ -238,9 +288,9 @@ export function StageDetailView({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="pending">Ожидает</SelectItem>
-                <SelectItem value="in_progress">В работе</SelectItem>
-                <SelectItem value="completed">Завершён</SelectItem>
+                <SelectItem value="pending">⚪ Ожидает</SelectItem>
+                <SelectItem value="in_progress">🔵 В работе</SelectItem>
+                <SelectItem value="completed">🟢 Завершён</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -319,7 +369,7 @@ export function StageDetailView({
 
               <div className="flex gap-2 pt-2">
                 {!stage.actual_start_date && stage.status !== 'in_progress' && (
-                  <Button 
+                  <Button
                     onClick={() => startStageMutation.mutate()}
                     disabled={startStageMutation.isPending}
                     data-testid="button-start-stage"
@@ -330,7 +380,7 @@ export function StageDetailView({
                   </Button>
                 )}
                 {stage.status === 'in_progress' && !stage.actual_end_date && (
-                  <Button 
+                  <Button
                     onClick={() => completeStageMutation.mutate()}
                     disabled={completeStageMutation.isPending}
                     data-testid="button-complete-stage"
@@ -341,6 +391,43 @@ export function StageDetailView({
                   </Button>
                 )}
               </div>
+
+              {/* Зависимости этапов */}
+              {(stageDependencies.length > 0 || dependentStages.length > 0) && (
+                <div className="space-y-3 pt-4 border-t mt-4">
+                  {stageDependencies.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-sm font-medium">
+                        <Link2 className="w-4 h-4 text-primary" />
+                        <span>Этот этап зависит от:</span>
+                      </div>
+                      <div className="flex flex-wrap gap-2 ml-6">
+                        {stageDependencies.map(dep => (
+                          <Badge key={dep.id} variant="outline" className="text-xs bg-blue-50 dark:bg-blue-950/20">
+                            {getStageName(dep.depends_on_stage_id)}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {dependentStages.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-sm font-medium">
+                        <TrendingUp className="w-4 h-4 text-orange-500" />
+                        <span>От этого этапа зависят:</span>
+                      </div>
+                      <div className="flex flex-wrap gap-2 ml-6">
+                        {dependentStages.map(dep => (
+                          <Badge key={dep.id} variant="outline" className="text-xs bg-orange-50 dark:bg-orange-950/20">
+                            {getStageName(dep.dependent_stage_id)}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </CardContent>
@@ -348,45 +435,90 @@ export function StageDetailView({
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Документы этапа</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base">Документы этапа</CardTitle>
+            <Badge variant="secondary" className="text-xs">
+              {documents.length}
+            </Badge>
+          </div>
         </CardHeader>
         <CardContent className="space-y-3">
           {documents.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center">Нет документов</p>
+            <div className="text-center py-6">
+              <FileText className="w-12 h-12 mx-auto text-muted-foreground/50 mb-2" />
+              <p className="text-sm text-muted-foreground">Нет документов</p>
+            </div>
           ) : (
             <div className="space-y-2">
               {documents.map((doc) => (
-                <div key={doc.id} className="flex items-center justify-between p-2 border rounded-md">
-                  <div className="flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-sm">{doc.name}</span>
-                  </div>
-                  {doc.file_url && (
-                    <Button size="sm" variant="ghost" data-testid={`button-download-${doc.id}`}>
-                      <Download className="w-4 h-4" />
-                    </Button>
-                  )}
-                </div>
+                <Card
+                  key={doc.id}
+                  className="border-l-4 border-blue-500 bg-blue-50/30 dark:bg-blue-950/20 hover:bg-blue-50/50 dark:hover:bg-blue-950/30 transition-colors"
+                >
+                  <CardContent className="p-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <div className="flex-shrink-0">
+                          {getFileIcon(doc.name)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{doc.name}</p>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                            <span>{new Date(doc.created_at || Date.now()).toLocaleDateString('ru-RU')}</span>
+                            {doc.uploaded_by_name && (
+                              <>
+                                <span>•</span>
+                                <span>{doc.uploaded_by_name}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      {doc.file_url && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          data-testid={`button-download-${doc.id}`}
+                          className="flex-shrink-0"
+                        >
+                          <Download className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
               ))}
             </div>
           )}
-          <div 
-            className={`relative border-2 border-dashed rounded-lg p-4 transition-colors ${isDragging ? 'border-primary bg-primary/5' : 'border-muted-foreground/25'}`}
+          <div
+            className={`relative border-2 border-dashed rounded-lg p-6 transition-all duration-200 ${
+              isDragging
+                ? 'border-primary bg-primary/10 scale-[1.02]'
+                : 'border-muted-foreground/25 hover:border-primary/50 hover:bg-accent/50'
+            }`}
             onDrop={handleDrop}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
           >
-            <Input
-              type="file"
-              multiple
-              onChange={handleFileUpload}
-              disabled={uploadingFile}
-              className="cursor-pointer"
-              data-testid="input-file-upload"
-            />
-            <p className="text-xs text-muted-foreground text-center mt-2">
-              {uploadingFile ? "Загрузка..." : "Перетащите файлы или выберите"}
-            </p>
+            <div className="flex flex-col items-center gap-2">
+              <Upload className={`w-8 h-8 ${isDragging ? 'text-primary' : 'text-muted-foreground'}`} />
+              <div className="text-center">
+                <p className="text-sm font-medium">
+                  {uploadingFile ? "Загрузка..." : "Перетащите файлы сюда"}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  или нажмите для выбора
+                </p>
+              </div>
+              <Input
+                type="file"
+                multiple
+                onChange={handleFileUpload}
+                disabled={uploadingFile}
+                className="absolute inset-0 opacity-0 cursor-pointer"
+                data-testid="input-file-upload"
+              />
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -394,21 +526,39 @@ export function StageDetailView({
       {projectId && allProjectDocuments.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Все документы проекта</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base">Все документы проекта</CardTitle>
+              <Badge variant="secondary" className="text-xs">
+                {allProjectDocuments.length}
+              </Badge>
+            </div>
           </CardHeader>
           <CardContent>
             <ScrollArea className="h-[200px]">
-              <div className="space-y-2">
+              <div className="space-y-2 pr-4">
                 {allProjectDocuments.map((doc: any) => (
-                  <div key={doc.id} className="flex items-start gap-2 p-2 border rounded-md">
-                    <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{doc.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {doc.stage_name} • {doc.user_name || 'Неизвестно'}
-                      </p>
-                    </div>
-                  </div>
+                  <Card
+                    key={doc.id}
+                    className="border-l-4 border-gray-400 bg-accent/30 hover:bg-accent/50 transition-colors"
+                  >
+                    <CardContent className="p-3">
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0">
+                          {getFileIcon(doc.name)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{doc.name}</p>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                            <Badge variant="outline" className="text-xs">
+                              {doc.stage_name}
+                            </Badge>
+                            <span>•</span>
+                            <span>{doc.user_name || 'Неизвестно'}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
                 ))}
               </div>
             </ScrollArea>
@@ -418,31 +568,64 @@ export function StageDetailView({
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Чат этапа</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base">Чат этапа</CardTitle>
+            <Badge variant="secondary" className="text-xs">
+              {messages.length}
+            </Badge>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <ScrollArea className="h-[300px] pr-4">
             <div className="space-y-3">
               {messages.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center">Нет сообщений</p>
+                <div className="text-center py-6">
+                  <Send className="w-12 h-12 mx-auto text-muted-foreground/50 mb-2" />
+                  <p className="text-sm text-muted-foreground">Нет сообщений</p>
+                  <p className="text-xs text-muted-foreground mt-1">Начните обсуждение этапа</p>
+                </div>
               ) : (
                 messages.map((msg) => (
-                  <div key={msg.id} className="border-l-2 border-primary pl-3 py-1">
-                    <p className="text-sm">{msg.message}</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {msg.user_name} • {new Date(msg.created_at).toLocaleString('ru-RU')}
-                    </p>
-                  </div>
+                  <Card
+                    key={msg.id}
+                    className="border-l-4 border-primary bg-primary/5 dark:bg-primary/10"
+                  >
+                    <CardContent className="p-3">
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0">
+                          <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+                            <span className="text-xs font-medium text-primary">
+                              {msg.user_name?.charAt(0)?.toUpperCase() || '?'}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-xs font-medium">{msg.user_name}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(msg.created_at).toLocaleString('ru-RU', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </span>
+                          </div>
+                          <p className="text-sm whitespace-pre-wrap break-words">{msg.message}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
                 ))
               )}
             </div>
           </ScrollArea>
-          
+
           <div className="flex gap-2">
             <Textarea
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
-              placeholder="Написать сообщение..."
+              placeholder="Написать сообщение... (Enter для отправки, Shift+Enter для новой строки)"
               className="min-h-[80px]"
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
@@ -457,6 +640,7 @@ export function StageDetailView({
               onClick={handleSendMessage}
               disabled={!newMessage.trim() || createMessageMutation.isPending}
               data-testid="button-send-message"
+              className="h-auto"
             >
               <Send className="w-4 h-4" />
             </Button>

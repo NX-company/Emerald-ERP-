@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Edit2, Plus, Trash2, Settings2, ArrowLeft, Wand2 } from "lucide-react";
+import { Loader2, Edit2, Plus, Trash2, Settings2, ArrowLeft, Wand2, Image as ImageIcon, X, ZoomIn } from "lucide-react";
 import { LocalStageEditor, LocalStage, LocalStageDependency } from "./LocalStageEditor";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -30,6 +30,7 @@ interface InvoicePosition {
   article?: string;
   quantity: number;
   price: string;
+  imageUrl?: string;
 }
 
 interface PositionStagesData {
@@ -67,6 +68,7 @@ export function CreateProjectDialog({
   const [positionStagesData, setPositionStagesData] = useState<Record<number, PositionStagesData>>({});
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
   const [isApplyingTemplate, setIsApplyingTemplate] = useState(false);
+  const [imagePreview, setImagePreview] = useState<{ url: string; index: number } | null>(null);
 
   // Load templates
   const { data: templates = [] } = useQuery<any[]>({
@@ -113,6 +115,7 @@ export function CreateProjectDialog({
       name: "Новая позиция",
       quantity: 1,
       price: "0",
+      imageUrl: undefined,
     };
     setPositions([...positions, newPosition]);
     setSelectedIndices(new Set(Array.from(selectedIndices).concat(positions.length)));
@@ -153,6 +156,42 @@ export function CreateProjectDialog({
     setPositions(newPositions);
   };
 
+  const handlePasteImage = async (event: React.ClipboardEvent, index: number) => {
+    const items = event.clipboardData?.items;
+    if (!items) return;
+
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image') !== -1) {
+        event.preventDefault();
+        const file = items[i].getAsFile();
+        if (!file) continue;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const base64 = e.target?.result as string;
+          const newPositions = [...positions];
+          newPositions[index] = { ...newPositions[index], imageUrl: base64 };
+          setPositions(newPositions);
+          toast({
+            title: "Изображение добавлено",
+            description: "Изображение успешно вставлено из буфера обмена",
+          });
+        };
+        reader.readAsDataURL(file);
+        break;
+      }
+    }
+  };
+
+  const handleRemoveImage = (index: number) => {
+    const newPositions = [...positions];
+    newPositions[index] = { ...newPositions[index], imageUrl: undefined };
+    setPositions(newPositions);
+    toast({
+      title: "Изображение удалено",
+    });
+  };
+
   const handleCreate = () => {
     onCreateProject(Array.from(selectedIndices), positions, positionStagesData);
   };
@@ -167,16 +206,95 @@ export function CreateProjectDialog({
     setCurrentTab("positions");
   };
 
+  const handleApplyTemplateToAll = async () => {
+    if (!selectedTemplateId) return;
+
+    setIsApplyingTemplate(true);
+    try {
+      const response = await apiRequest<any>(
+        "GET",
+        `/api/templates/${selectedTemplateId}`
+      );
+      const data = response;
+
+      if (!data || !data.stages || !Array.isArray(data.stages)) {
+        throw new Error("Invalid template data structure");
+      }
+
+      const { template, stages, dependencies = [] } = data;
+
+      // Применить шаблон ко всем выбранным позициям
+      const newStagesData: Record<number, PositionStagesData> = {};
+
+      selectedIndices.forEach(positionIndex => {
+        // Create stage ID mapping with crypto.randomUUID() for uniqueness
+        const stageIdMap: Record<string, string> = {};
+        stages.forEach((stage: any) => {
+          stageIdMap[stage.id] = crypto.randomUUID();
+        });
+
+        // Map template stages to LocalStage format
+        const localStages: LocalStage[] = stages.map((stage: any) => {
+          const stageObj: LocalStage = {
+            id: stageIdMap[stage.id],
+            name: stage.name || '',
+            order_index: stage.order,
+          };
+          if (stage.duration_days) stageObj.duration_days = stage.duration_days;
+          if (stage.assignee_id) stageObj.assignee_id = stage.assignee_id;
+          if (stage.cost) stageObj.cost = parseFloat(stage.cost);
+          if (stage.description) stageObj.description = stage.description;
+          return stageObj;
+        });
+
+        // Map dependencies with validation
+        const localDependencies: LocalStageDependency[] = dependencies
+          .filter((dep: any) => {
+            const hasValidIds = stageIdMap[dep.template_stage_id] && stageIdMap[dep.depends_on_template_stage_id];
+            if (!hasValidIds) {
+              console.warn("Skipping dependency with missing stage IDs:", dep);
+            }
+            return hasValidIds;
+          })
+          .map((dep: any) => ({
+            stage_id: stageIdMap[dep.template_stage_id],
+            depends_on_stage_id: stageIdMap[dep.depends_on_template_stage_id],
+          }));
+
+        newStagesData[positionIndex] = {
+          stages: localStages,
+          dependencies: localDependencies,
+        };
+      });
+
+      setPositionStagesData(prev => ({
+        ...prev,
+        ...newStagesData,
+      }));
+
+      toast({
+        description: `Шаблон "${template.name}" применён к ${selectedIndices.size} позициям`
+      });
+      setSelectedTemplateId("");
+    } catch (error) {
+      console.error("Error applying template to all:", error);
+      const message = error instanceof Error ? error.message : "Ошибка при применении шаблона";
+      toast({ description: message, variant: "destructive" });
+    } finally {
+      setIsApplyingTemplate(false);
+    }
+  };
+
   const handleApplyTemplate = async () => {
     if (!selectedTemplateId || selectedPositionForStages === null) return;
 
     setIsApplyingTemplate(true);
     try {
-      const response = await apiRequest(
+      const response = await apiRequest<any>(
         "GET",
         `/api/templates/${selectedTemplateId}`
       );
-      const data: any = await response.json();
+      const data = response;
 
       // API returns { template, stages, dependencies }
       if (!data || !data.stages || !Array.isArray(data.stages)) {
@@ -192,15 +310,18 @@ export function CreateProjectDialog({
       });
 
       // Map template stages to LocalStage format
-      const localStages: LocalStage[] = stages.map((stage: any) => ({
-        id: stageIdMap[stage.id],
-        name: stage.name,
-        order_index: stage.order,
-        duration_days: stage.duration_days,
-        assignee_role: stage.assignee_role,
-        cost: stage.cost ? parseFloat(stage.cost) : undefined,
-        description: stage.description,
-      }));
+      const localStages: LocalStage[] = stages.map((stage: any) => {
+        const stageObj: LocalStage = {
+          id: stageIdMap[stage.id],
+          name: stage.name || '',
+          order_index: stage.order,
+        };
+        if (stage.duration_days) stageObj.duration_days = stage.duration_days;
+        if (stage.assignee_id) stageObj.assignee_id = stage.assignee_id;
+        if (stage.cost) stageObj.cost = parseFloat(stage.cost);
+        if (stage.description) stageObj.description = stage.description;
+        return stageObj;
+      });
 
       // Map dependencies with validation - skip invalid dependencies
       const localDependencies: LocalStageDependency[] = dependencies
@@ -212,7 +333,6 @@ export function CreateProjectDialog({
           return hasValidIds;
         })
         .map((dep: any) => ({
-          id: crypto.randomUUID(),
           stage_id: stageIdMap[dep.template_stage_id],
           depends_on_stage_id: stageIdMap[dep.depends_on_template_stage_id],
         }));
@@ -286,16 +406,49 @@ export function CreateProjectDialog({
                 Выбрать все ({selectedIndices.size} из {positions.length})
               </label>
             </div>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={handleAddPosition}
-              data-testid="button-add-position"
-            >
-              <Plus className="w-4 h-4 mr-1" />
-              Добавить
-            </Button>
+            <div className="flex gap-2">
+              <Select
+                value={selectedTemplateId}
+                onValueChange={setSelectedTemplateId}
+                disabled={isApplyingTemplate}
+              >
+                <SelectTrigger className="w-[200px]" data-testid="select-template-all">
+                  <SelectValue placeholder="Шаблон для всех" />
+                </SelectTrigger>
+                <SelectContent>
+                  {templates.map((template) => (
+                    <SelectItem key={template.id} value={template.id}>
+                      {template.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={handleApplyTemplateToAll}
+                disabled={!selectedTemplateId || isApplyingTemplate}
+                data-testid="button-apply-template-all"
+              >
+                {isApplyingTemplate ? (
+                  <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                ) : (
+                  <Wand2 className="w-4 h-4 mr-1" />
+                )}
+                Применить ко всем
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={handleAddPosition}
+                data-testid="button-add-position"
+              >
+                <Plus className="w-4 h-4 mr-1" />
+                Добавить
+              </Button>
+            </div>
           </div>
 
           <ScrollArea className="h-[280px] pr-3">
@@ -305,6 +458,8 @@ export function CreateProjectDialog({
                   key={index}
                   className="flex items-start gap-2 p-2 rounded-lg border hover-elevate"
                   data-testid={`position-${index}`}
+                  onPaste={editingIndex === index ? (e) => handlePasteImage(e, index) : undefined}
+                  tabIndex={editingIndex === index ? -1 : undefined}
                 >
                   <Checkbox
                     id={`position-${index}`}
@@ -313,7 +468,7 @@ export function CreateProjectDialog({
                     data-testid={`checkbox-position-${index}`}
                     className="mt-0.5"
                   />
-                  
+
                   {editingIndex === index ? (
                     <div className="flex-1 space-y-2">
                       <Input
@@ -322,12 +477,6 @@ export function CreateProjectDialog({
                         placeholder="Название"
                         data-testid={`input-edit-name-${index}`}
                         autoFocus
-                      />
-                      <Input
-                        value={position.article || ""}
-                        onChange={(e) => handleUpdatePosition(index, 'article', e.target.value)}
-                        placeholder="Артикул"
-                        data-testid={`input-edit-article-${index}`}
                       />
                       <div className="flex gap-2">
                         <Input
@@ -355,18 +504,61 @@ export function CreateProjectDialog({
                           Готово
                         </Button>
                       </div>
+                      <div className="flex items-center gap-2">
+                        {position.imageUrl ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => setImagePreview({ url: position.imageUrl!, index })}
+                              className="relative w-12 h-12 rounded border hover:border-primary transition-colors"
+                            >
+                              <img
+                                src={position.imageUrl}
+                                alt="Preview"
+                                className="w-full h-full object-cover rounded"
+                              />
+                              <ZoomIn className="absolute inset-0 m-auto w-4 h-4 text-white opacity-0 hover:opacity-100 transition-opacity" />
+                            </button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleRemoveImage(index)}
+                            >
+                              <X className="w-4 h-4 mr-1" />
+                              Удалить фото
+                            </Button>
+                          </>
+                        ) : (
+                          <div className="text-xs text-muted-foreground flex items-center gap-1 p-2 border rounded bg-muted/30">
+                            <ImageIcon className="w-3 h-3" />
+                            Нажмите Ctrl+V чтобы вставить изображение
+                          </div>
+                        )}
+                      </div>
                     </div>
                   ) : (
                     <div className="flex-1 flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm" data-testid={`text-position-name-${index}`}>
-                          {position.name}
-                        </p>
-                        {position.article && (
-                          <p className="text-xs text-muted-foreground" data-testid={`text-position-article-${index}`}>
-                            Артикул: {position.article}
-                          </p>
+                      <div className="flex items-start gap-2 flex-1 min-w-0">
+                        {position.imageUrl && (
+                          <button
+                            type="button"
+                            onClick={() => setImagePreview({ url: position.imageUrl!, index })}
+                            className="relative w-12 h-12 rounded border hover:border-primary transition-colors shrink-0"
+                          >
+                            <img
+                              src={position.imageUrl}
+                              alt="Preview"
+                              className="w-full h-full object-cover rounded"
+                            />
+                            <ZoomIn className="absolute inset-0 m-auto w-4 h-4 text-white opacity-0 hover:opacity-100 transition-opacity" />
+                          </button>
                         )}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm" data-testid={`text-position-name-${index}`}>
+                            {position.name}
+                          </p>
+                        </div>
                       </div>
                       <div className="text-right shrink-0">
                         <p className="text-sm font-medium" data-testid={`text-position-price-${index}`}>
@@ -380,7 +572,7 @@ export function CreateProjectDialog({
                         <Button
                           type="button"
                           size="sm"
-                          variant="outline"
+                          variant={positionStagesData[index]?.stages?.length > 0 ? "default" : "outline"}
                           onClick={(e) => {
                             e.stopPropagation();
                             goToStages(index);
@@ -389,6 +581,11 @@ export function CreateProjectDialog({
                         >
                           <Settings2 className="w-3 h-3 mr-1" />
                           Этапы
+                          {positionStagesData[index]?.stages?.length > 0 && (
+                            <span className="ml-1 px-1.5 py-0.5 bg-white/20 rounded text-xs">
+                              {positionStagesData[index].stages.length}
+                            </span>
+                          )}
                         </Button>
                         <Button
                           type="button"
@@ -399,17 +596,15 @@ export function CreateProjectDialog({
                         >
                           <Edit2 className="w-4 h-4" />
                         </Button>
-                        {index >= invoicePositions.length && (
-                          <Button
-                            type="button"
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => handleDeletePosition(index)}
-                            data-testid={`button-delete-${index}`}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        )}
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => handleDeletePosition(index)}
+                          data-testid={`button-delete-${index}`}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
                       </div>
                     </div>
                   )}
@@ -506,6 +701,38 @@ export function CreateProjectDialog({
           </DialogFooter>
         </div>
       </DialogContent>
+
+      {/* Image Preview Dialog */}
+      {imagePreview && (
+        <Dialog open={!!imagePreview} onOpenChange={() => setImagePreview(null)}>
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle>Изображение позиции</DialogTitle>
+            </DialogHeader>
+            <div className="flex items-center justify-center p-4">
+              <img
+                src={imagePreview.url}
+                alt="Preview"
+                className="max-w-full max-h-[70vh] object-contain rounded"
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setImagePreview(null)}>
+                Закрыть
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  handleRemoveImage(imagePreview.index);
+                  setImagePreview(null);
+                }}
+              >
+                Удалить
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </Dialog>
   );
 }

@@ -19,10 +19,24 @@ import {
 
 export class ProjectsRepository {
   // Project methods
-  async getAllProjects(): Promise<Array<Project & { stages: ProjectStage[] }>> {
-    const allProjects = await db.select().from(projects);
+  async getAllProjects(): Promise<Array<any>> {
+    const result = await db
+      .select()
+      .from(projects)
+      .leftJoin(users, eq(projects.manager_id, users.id));
+
+    const projectsWithManager = result.map(r => ({
+      ...r.projects,
+      manager_user: r.users ? {
+        id: r.users.id,
+        username: r.users.username,
+        full_name: r.users.full_name,
+        email: r.users.email,
+      } : null,
+    }));
+
     const projectsWithStages = await Promise.all(
-      allProjects.map(async (project) => {
+      projectsWithManager.map(async (project) => {
         const stages = await this.getProjectStages(project.id);
         return { ...project, stages };
       })
@@ -30,16 +44,29 @@ export class ProjectsRepository {
     return projectsWithStages;
   }
 
-  async getProjectById(id: string): Promise<(Project & { stages: ProjectStage[] }) | undefined> {
-    const result = await db.select().from(projects).where(eq(projects.id, id));
-    const project = result[0];
-    
-    if (!project) {
+  async getProjectById(id: string): Promise<any | undefined> {
+    const result = await db
+      .select()
+      .from(projects)
+      .leftJoin(users, eq(projects.manager_id, users.id))
+      .where(eq(projects.id, id));
+
+    if (!result[0]) {
       return undefined;
     }
-    
+
+    const projectWithManager = {
+      ...result[0].projects,
+      manager_user: result[0].users ? {
+        id: result[0].users.id,
+        username: result[0].users.username,
+        full_name: result[0].users.full_name,
+        email: result[0].users.email,
+      } : null,
+    };
+
     const stages = await this.getProjectStages(id);
-    return { ...project, stages };
+    return { ...projectWithManager, stages };
   }
 
   async createProject(data: InsertProject): Promise<Project> {
@@ -370,14 +397,22 @@ export class ProjectsRepository {
   }
 
   private async createStagesWithDependencies(
-    projectId: string, 
-    itemId: string, 
-    stages: { id: string; name: string; order_index: number }[],
+    projectId: string,
+    itemId: string,
+    stages: {
+      id: string;
+      name: string;
+      order_index: number;
+      duration_days?: number;
+      assignee_id?: string;
+      cost?: number;
+      description?: string;
+    }[],
     dependencies: { stage_id: string; depends_on_stage_id: string }[]
   ): Promise<void> {
     // Карта для сопоставления временных ID с реальными ID этапов
     const stageIdMap = new Map<string, string>();
-    
+
     // Создать все этапы
     for (const stage of stages) {
       const newStage = await this.createProjectStage({
@@ -386,8 +421,12 @@ export class ProjectsRepository {
         name: stage.name,
         status: "pending",
         order: stage.order_index,
+        duration_days: stage.duration_days,
+        assignee_id: stage.assignee_id,
+        cost: stage.cost,
+        description: stage.description,
       });
-      
+
       stageIdMap.set(stage.id, newStage.id);
     }
     

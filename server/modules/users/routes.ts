@@ -8,11 +8,46 @@ export const router = Router();
 // GET /api/users - Get all users
 router.get("/api/users", async (req, res) => {
   try {
-    const users = await usersRepository.getAllUsers();
-    res.json(users);
+    const includeRoles = req.query.includeRoles === 'true';
+
+    if (includeRoles) {
+      const users = await usersRepository.getUsersWithRoles();
+      res.json(users);
+    } else {
+      const users = await usersRepository.getAllUsers();
+      res.json(users);
+    }
   } catch (error) {
     console.error("Error fetching users:", error);
     res.status(500).json({ error: "Failed to fetch users" });
+  }
+});
+
+// POST /api/users - Create new user
+router.post("/api/users", async (req, res) => {
+  try {
+    const validationResult = insertUserSchema.safeParse(req.body);
+
+    if (!validationResult.success) {
+      const errorMessage = fromZodError(validationResult.error).toString();
+      res.status(400).json({ error: errorMessage });
+      return;
+    }
+
+    if (!validationResult.data.password || validationResult.data.password.trim() === "") {
+      res.status(400).json({ error: "Password is required" });
+      return;
+    }
+
+    const newUser = await usersRepository.createUser(validationResult.data);
+    res.status(201).json(newUser);
+  } catch (error: any) {
+    console.error("Error creating user:", error);
+    if (error.message && error.message.includes("UNIQUE constraint failed")) {
+      res.status(400).json({ error: "Username already exists" });
+    } else {
+      res.status(500).json({ error: "Failed to create user" });
+    }
   }
 });
 
@@ -21,12 +56,28 @@ router.get("/api/users/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const user = await usersRepository.getUser(id);
-    
+
     if (!user) {
       res.status(404).json({ error: "User not found" });
       return;
     }
-    
+
+    // Add all permissions for admin user
+    if (user.username === 'admin') {
+      res.json({
+        ...user,
+        can_create_deals: true,
+        can_edit_deals: true,
+        can_delete_deals: true,
+        can_view_deals: true,
+        can_create_projects: true,
+        can_edit_projects: true,
+        can_delete_projects: true,
+        can_view_projects: true,
+      });
+      return;
+    }
+
     res.json(user);
   } catch (error) {
     console.error("Error fetching user:", error);
@@ -83,32 +134,52 @@ router.delete("/api/users/:id", async (req, res) => {
   }
 });
 
-// PUT /api/users/:id/permissions - Update user permissions
-router.put("/api/users/:id/permissions", async (req, res) => {
+// PUT /api/users/:id/role - Assign role to user
+router.put("/api/users/:id/role", async (req, res) => {
   try {
     const { id } = req.params;
-    const { can_create_deals, can_edit_deals, can_delete_deals } = req.body;
-    
-    const permissions: any = {};
-    if (typeof can_create_deals === "boolean") permissions.can_create_deals = can_create_deals;
-    if (typeof can_edit_deals === "boolean") permissions.can_edit_deals = can_edit_deals;
-    if (typeof can_delete_deals === "boolean") permissions.can_delete_deals = can_delete_deals;
-    
-    if (Object.keys(permissions).length === 0) {
-      res.status(400).json({ error: "No valid permissions provided" });
+    const { roleId } = req.body;
+
+    if (roleId !== null && typeof roleId !== "string") {
+      res.status(400).json({ error: "Invalid roleId" });
       return;
     }
-    
-    const updatedUser = await usersRepository.updateUserPermissions(id, permissions);
-    
+
+    const updatedUser = await usersRepository.assignRole(id, roleId);
+
     if (!updatedUser) {
       res.status(404).json({ error: "User not found" });
       return;
     }
-    
+
     res.json(updatedUser);
   } catch (error) {
-    console.error("Error updating user permissions:", error);
-    res.status(500).json({ error: "Failed to update user permissions" });
+    console.error("Error assigning role to user:", error);
+    res.status(500).json({ error: "Failed to assign role" });
+  }
+});
+
+// PUT /api/users/:id/status - Update user active status
+router.put("/api/users/:id/status", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { isActive } = req.body;
+
+    if (typeof isActive !== "boolean") {
+      res.status(400).json({ error: "isActive must be a boolean" });
+      return;
+    }
+
+    const updatedUser = await usersRepository.setUserStatus(id, isActive);
+
+    if (!updatedUser) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+
+    res.json(updatedUser);
+  } catch (error) {
+    console.error("Error updating user status:", error);
+    res.status(500).json({ error: "Failed to update user status" });
   }
 });

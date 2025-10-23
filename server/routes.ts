@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+// Trigger reload
 
 // Import modular routes
 import { router as salesRouter } from "./modules/sales/routes";
@@ -11,10 +12,14 @@ import { router as installationRouter } from "./modules/installation/routes";
 import { router as tasksRouter } from "./modules/tasks/routes";
 import { router as documentsRouter } from "./modules/documents/routes";
 import { router as usersRouter } from "./modules/users/routes";
+import { router as rolesRouter } from "./modules/roles/routes";
+import { router as permissionsRouter } from "./modules/permissions/routes";
 import { router as settingsRouter } from "./modules/settings/routes";
 import { router as attachmentsRouter } from "./modules/attachments/routes";
 import { router as customFieldsRouter } from "./modules/custom-fields/routes";
 import { router as templatesRouter } from "./modules/templates/routes";
+import salesPipelinesRouter from "./modules/sales-pipelines/routes";
+import dealContactsRouter from "./modules/deal-contacts/routes";
 import aiRouter from "./modules/ai/routes";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -28,10 +33,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(tasksRouter);
   app.use(documentsRouter);
   app.use(usersRouter);
+  app.use(rolesRouter);
+  app.use(permissionsRouter);
   app.use(settingsRouter);
   app.use(attachmentsRouter);
   app.use(customFieldsRouter);
   app.use(templatesRouter);
+  app.use('/api/sales-pipelines', salesPipelinesRouter);
+  app.use(dealContactsRouter);
   app.use(aiRouter);
 
   const httpServer = createServer(app);

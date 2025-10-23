@@ -5,7 +5,13 @@ import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 const pdfParse = require('pdf-parse');
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const openai = process.env.OPENAI_API_KEY 
+  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  : null;
+
+if (!openai) {
+  console.warn("⚠️  WARNING: OPENAI_API_KEY is not set. AI features will be disabled.");
+}
 
 const SYSTEM_PROMPT = `Вы - эксперт по расчёту мебели и созданию коммерческих предложений.
 
@@ -36,6 +42,10 @@ const SYSTEM_PROMPT = `Вы - эксперт по расчёту мебели и
 
 export class AiService {
   async analyzePdf(base64Pdf: string, dealId: string, userId: string, userMessage?: string) {
+    if (!openai) {
+      throw new Error("AI service is not available. Please configure OPENAI_API_KEY.");
+    }
+
     const corrections = await aiRepository.getCorrections(dealId);
     const materials = await aiRepository.getMaterialPrices();
     
@@ -81,6 +91,10 @@ export class AiService {
   }
 
   async chat(dealId: string, userId: string, message: string) {
+    if (!openai) {
+      throw new Error("AI service is not available. Please configure OPENAI_API_KEY.");
+    }
+
     await aiRepository.createChatMessage({
       deal_id: dealId,
       user_id: userId,

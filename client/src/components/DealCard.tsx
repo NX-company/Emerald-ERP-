@@ -16,6 +16,9 @@ interface DealCardProps {
 }
 
 export function DealCard({ id, orderNumber, clientName, company, amount, deadline, manager, tags = [], onClick }: DealCardProps) {
+  // Ensure tags is always an array
+  const safeTags = Array.isArray(tags) ? tags : [];
+
   return (
     <Card className="hover-elevate active-elevate-2 cursor-pointer" data-testid={`card-deal-${id}`} onClick={onClick}>
       <CardHeader className="pb-3">
@@ -60,9 +63,9 @@ export function DealCard({ id, orderNumber, clientName, company, amount, deadlin
           </div>
         </div>
 
-        {tags.length > 0 && (
+        {safeTags.length > 0 && (
           <div className="flex flex-wrap gap-1 pt-2 border-t">
-            {tags.map((tag) => (
+            {safeTags.map((tag) => (
               <Badge key={tag} variant="secondary" className="text-xs">
                 {tag}
               </Badge>

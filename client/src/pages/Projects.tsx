@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Plus, Calendar } from "lucide-react";
-import { ProjectCard } from "@/components/ProjectCard";
+import { ProjectDetailCard } from "@/components/ProjectDetailCard";
 import { ProjectDetailSheet } from "@/components/ProjectDetailSheet";
 import { ProjectCreateDialog } from "@/components/ProjectCreateDialog";
 import { GanttChart } from "@/components/GanttChart";
@@ -71,6 +71,7 @@ export default function Projects() {
     status: project.status,
     durationDays: project.duration_days || 0,
     manager: getUserName(project.manager_id),
+    started_at: project.started_at,
     stages: project.stages.map(stage => ({
       name: stage.name,
       status: stage.status,
@@ -137,74 +138,82 @@ export default function Projects() {
         </TabsList>
         <TabsContent value="all" className="mt-6">
           {isLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="space-y-4">
               {[1, 2, 3].map((i) => (
-                <Skeleton key={i} className="h-64" data-testid={`skeleton-project-${i}`} />
+                <Skeleton key={i} className="h-48" data-testid={`skeleton-project-${i}`} />
               ))}
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="space-y-4">
               {transformedProjects.map((project) => (
-                <div key={project.id} onClick={() => handleProjectClick(project.id)}>
-                  <ProjectCard {...project} />
-                </div>
+                <ProjectDetailCard
+                  key={project.id}
+                  {...project}
+                  onClick={() => handleProjectClick(project.id)}
+                />
               ))}
             </div>
           )}
         </TabsContent>
         <TabsContent value="pending" className="mt-6">
           {isLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="space-y-4">
               {[1].map((i) => (
-                <Skeleton key={i} className="h-64" data-testid={`skeleton-project-${i}`} />
+                <Skeleton key={i} className="h-48" data-testid={`skeleton-project-${i}`} />
               ))}
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="space-y-4">
               {transformedProjects
                 .filter((p) => p.status === "pending")
                 .map((project) => (
-                  <div key={project.id} onClick={() => handleProjectClick(project.id)}>
-                    <ProjectCard {...project} />
-                  </div>
+                  <ProjectDetailCard
+                    key={project.id}
+                    {...project}
+                    onClick={() => handleProjectClick(project.id)}
+                  />
                 ))}
             </div>
           )}
         </TabsContent>
         <TabsContent value="in_progress" className="mt-6">
           {isLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="space-y-4">
               {[1, 2].map((i) => (
-                <Skeleton key={i} className="h-64" data-testid={`skeleton-project-${i}`} />
+                <Skeleton key={i} className="h-48" data-testid={`skeleton-project-${i}`} />
               ))}
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="space-y-4">
               {transformedProjects
                 .filter((p) => p.status === "in_progress")
                 .map((project) => (
-                  <div key={project.id} onClick={() => handleProjectClick(project.id)}>
-                    <ProjectCard {...project} />
-                  </div>
+                  <ProjectDetailCard
+                    key={project.id}
+                    {...project}
+                    onClick={() => handleProjectClick(project.id)}
+                  />
                 ))}
             </div>
           )}
         </TabsContent>
         <TabsContent value="completed" className="mt-6">
           {isLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="space-y-4">
               {[1].map((i) => (
-                <Skeleton key={i} className="h-64" data-testid={`skeleton-project-${i}`} />
+                <Skeleton key={i} className="h-48" data-testid={`skeleton-project-${i}`} />
               ))}
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="space-y-4">
               {transformedProjects
                 .filter((p) => p.status === "completed")
                 .map((project) => (
-                  <div key={project.id} onClick={() => handleProjectClick(project.id)}>
-                    <ProjectCard {...project} />
-                  </div>
+                  <ProjectDetailCard
+                    key={project.id}
+                    {...project}
+                    onClick={() => handleProjectClick(project.id)}
+                  />
                 ))}
             </div>
           )}

@@ -11,7 +11,8 @@ import {
 
 const REPLIT_SIDECAR_ENDPOINT = "http://127.0.0.1:1106";
 
-export const objectStorageClient = new Storage({
+// Only initialize storage client if running on Replit
+export const objectStorageClient = process.env.REPL_ID ? new Storage({
   credentials: {
     audience: "replit",
     subject_token_type: "access_token",
@@ -27,7 +28,11 @@ export const objectStorageClient = new Storage({
     universe_domain: "googleapis.com",
   },
   projectId: "",
-});
+}) : null as any;
+
+if (!objectStorageClient) {
+  console.warn("⚠️  WARNING: Object storage is disabled (not running on Replit)");
+}
 
 export class ObjectNotFoundError extends Error {
   constructor() {

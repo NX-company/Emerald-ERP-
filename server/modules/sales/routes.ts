@@ -3,6 +3,9 @@ import { salesRepository } from "./repository";
 import { insertDealSchema, insertDealStageSchema, insertDealMessageSchema, insertDealDocumentSchema } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
 import { checkPermission } from "../../middleware/permissions";
+import { permissionsService } from "../permissions/service";
+import { activityLogsRepository } from "../tasks/repository";
+import { generateSimplePDF } from "./pdfGenerator";
 
 export const router = Router();
 
@@ -24,14 +27,17 @@ async function initializeDefaultDealStages() {
         defaultStages.map(stage => salesRepository.createDealStage(stage))
       );
       
-      console.log("Default deal stages created successfully");
+      console.log("✓ Default deal stages created successfully");
     }
   } catch (error) {
-    console.error("Error initializing default deal stages:", error);
+    console.warn("⚠️  Could not initialize default deal stages:", error.message);
   }
 }
 
-initializeDefaultDealStages();
+// Initialize stages asynchronously, don't block module loading
+initializeDefaultDealStages().catch(err => 
+  console.warn("⚠️  Failed to initialize deal stages:", err.message)
+);
 
 // ========== Deals Endpoints ==========
 
@@ -39,14 +45,26 @@ initializeDefaultDealStages();
 router.get("/api/deals", async (req, res) => {
   try {
     const { stage } = req.query;
-    
+    const userId = req.headers["x-user-id"] as string;
+
+    let deals;
     if (stage && typeof stage === "string") {
-      const deals = await salesRepository.getDealsByStage(stage);
-      res.json(deals);
+      deals = await salesRepository.getDealsByStage(stage);
     } else {
-      const deals = await salesRepository.getAllDeals();
-      res.json(deals);
+      deals = await salesRepository.getAllDeals();
     }
+
+    // Filter deals based on user permissions
+    if (userId) {
+      const canViewAll = await permissionsService.canViewAll(userId, "deals");
+
+      // If user cannot view all deals, filter to show only their deals
+      if (!canViewAll) {
+        deals = deals.filter(deal => deal.created_by === userId);
+      }
+    }
+
+    res.json(deals);
   } catch (error) {
     console.error("Error fetching deals:", error);
     res.status(500).json({ error: "Failed to fetch deals" });
@@ -74,15 +92,30 @@ router.get("/api/deals/:id", async (req, res) => {
 // POST /api/deals - Create new deal
 router.post("/api/deals", checkPermission("can_create_deals"), async (req, res) => {
   try {
+    console.log("Received deal data:", JSON.stringify(req.body, null, 2));
+    const userId = req.headers["x-user-id"] as string;
+
     const validationResult = insertDealSchema.safeParse(req.body);
-    
+
     if (!validationResult.success) {
       const errorMessage = fromZodError(validationResult.error).toString();
+      console.error("Validation error:", errorMessage);
       res.status(400).json({ error: errorMessage });
       return;
     }
-    
+
+    console.log("Validated deal data:", JSON.stringify(validationResult.data, null, 2));
     const newDeal = await salesRepository.createDeal(validationResult.data);
+
+    // Log activity
+    await activityLogsRepository.logActivity({
+      entity_type: "deal",
+      entity_id: newDeal.id,
+      action_type: "created",
+      user_id: userId,
+      description: `Создана сделка "${newDeal.client_name}"`,
+    });
+
     res.status(201).json(newDeal);
   } catch (error) {
     console.error("Error creating deal:", error);
@@ -94,23 +127,81 @@ router.post("/api/deals", checkPermission("can_create_deals"), async (req, res) 
 router.put("/api/deals/:id", checkPermission("can_edit_deals"), async (req, res) => {
   try {
     const { id } = req.params;
-    
+    const userId = req.headers["x-user-id"] as string;
+
+    // Get old deal data for comparison
+    const oldDeal = await salesRepository.getDealById(id);
+
     // Validate the update data using the same schema (partial is handled by the storage layer)
     const validationResult = insertDealSchema.partial().safeParse(req.body);
-    
+
     if (!validationResult.success) {
       const errorMessage = fromZodError(validationResult.error).toString();
       res.status(400).json({ error: errorMessage });
       return;
     }
-    
+
     const updatedDeal = await salesRepository.updateDeal(id, validationResult.data);
-    
+
     if (!updatedDeal) {
       res.status(404).json({ error: "Deal not found" });
       return;
     }
-    
+
+    // Log changes to activity log
+    const changedFields = Object.keys(validationResult.data);
+    for (const field of changedFields) {
+      const oldValue = oldDeal[field];
+      const newValue = validationResult.data[field];
+
+      if (oldValue !== newValue) {
+        let description = `Изменено поле "${field}"`;
+
+        // Custom descriptions for specific fields
+        if (field === "stage") {
+          // Get stage names from database
+          const stages = await salesRepository.getAllDealStages();
+          const stageMap = stages.reduce((acc, stage) => {
+            acc[stage.key] = stage.name;
+            return acc;
+          }, {} as Record<string, string>);
+
+          const oldStageName = stageMap[oldValue] || oldValue;
+          const newStageName = stageMap[newValue] || newValue;
+          description = `Изменен этап сделки с "${oldStageName}" на "${newStageName}"`;
+        } else if (field === "amount") {
+          description = `Изменена сумма сделки с ${oldValue} ₽ на ${newValue} ₽`;
+        } else if (field === "client_name") {
+          description = `Изменено имя клиента с "${oldValue}" на "${newValue}"`;
+        } else if (field === "currency") {
+          description = `Изменена валюта с "${oldValue}" на "${newValue}"`;
+        } else if (field === "assigned_to") {
+          description = `Изменен ответственный менеджер`;
+        } else if (field === "expected_close_date") {
+          description = `Изменена ожидаемая дата закрытия`;
+        } else if (field === "source") {
+          description = `Изменен источник сделки с "${oldValue}" на "${newValue}"`;
+        } else if (field === "contact_phone") {
+          description = `Изменен телефон контакта`;
+        } else if (field === "contact_email") {
+          description = `Изменен email контакта`;
+        } else if (field === "description") {
+          description = `Изменено описание сделки`;
+        }
+
+        await activityLogsRepository.logActivity({
+          entity_type: "deal",
+          entity_id: id,
+          action_type: "updated",
+          user_id: userId,
+          field_changed: field,
+          old_value: String(oldValue || ""),
+          new_value: String(newValue || ""),
+          description,
+        });
+      }
+    }
+
     res.json(updatedDeal);
   } catch (error) {
     console.error("Error updating deal:", error);
@@ -122,13 +213,29 @@ router.put("/api/deals/:id", checkPermission("can_edit_deals"), async (req, res)
 router.delete("/api/deals/:id", checkPermission("can_delete_deals"), async (req, res) => {
   try {
     const { id } = req.params;
+    const userId = req.headers["x-user-id"] as string;
+
+    // Get deal info before deleting for logging
+    const deal = await salesRepository.getDealById(id);
+
     const deleted = await salesRepository.deleteDeal(id);
-    
+
     if (!deleted) {
       res.status(404).json({ error: "Deal not found" });
       return;
     }
-    
+
+    // Log activity (this will remain in the database even after deal is deleted)
+    if (deal) {
+      await activityLogsRepository.logActivity({
+        entity_type: "deal",
+        entity_id: id,
+        action_type: "deleted",
+        user_id: userId,
+        description: `Удалена сделка "${deal.client_name}"`,
+      });
+    }
+
     res.status(204).send();
   } catch (error) {
     console.error("Error deleting deal:", error);
@@ -301,19 +408,38 @@ router.get("/api/deals/:id/messages", async (req, res) => {
 router.post("/api/deals/:id/messages", async (req, res) => {
   try {
     const { id } = req.params;
-    
+    const userId = req.headers["x-user-id"] as string;
+
     const validationResult = insertDealMessageSchema.safeParse({
       ...req.body,
       deal_id: id
     });
-    
+
     if (!validationResult.success) {
       const errorMessage = fromZodError(validationResult.error).toString();
       res.status(400).json({ error: errorMessage });
       return;
     }
-    
+
     const newMessage = await salesRepository.createDealMessage(validationResult.data);
+
+    // Log activity
+    const messageTypeNames: Record<string, string> = {
+      'note': 'Заметка',
+      'call': 'Звонок',
+      'email': 'Email',
+      'task': 'Задача'
+    };
+    const messageTypeName = messageTypeNames[newMessage.message_type] || 'Сообщение';
+
+    await activityLogsRepository.logActivity({
+      entity_type: "deal",
+      entity_id: id,
+      action_type: "created",
+      user_id: userId,
+      description: `Добавлено: ${messageTypeName}`,
+    });
+
     res.status(201).json(newMessage);
   } catch (error) {
     console.error("Error creating deal message:", error);
@@ -338,18 +464,56 @@ router.get("/api/deals/:id/documents", async (req, res) => {
 // GET /api/deals/:dealId/documents/:docId - получить документ по ID
 router.get("/api/deals/:dealId/documents/:docId", async (req, res) => {
   try {
+    const { dealId, docId } = req.params;
+    console.log(`📄 [Documents] GET /api/deals/${dealId}/documents/${docId}`);
+
+    const document = await salesRepository.getDealDocumentById(docId);
+
+    if (!document) {
+      console.log(`❌ [Documents] Document ${docId} not found`);
+      res.status(404).json({ error: "Document not found" });
+      return;
+    }
+
+    console.log(`✅ [Documents] Found document:`, {
+      id: document.id,
+      name: document.name,
+      document_type: document.document_type,
+      file_url: document.file_url,
+      is_signed: document.is_signed
+    });
+
+    res.json(document);
+  } catch (error) {
+    console.error("[Documents] Error fetching document:", error);
+    res.status(500).json({ error: "Failed to fetch document" });
+  }
+});
+
+// GET /api/deals/:dealId/documents/:docId/pdf - сгенерировать PDF для документа
+router.get("/api/deals/:dealId/documents/:docId/pdf", async (req, res) => {
+  try {
     const { docId } = req.params;
     const document = await salesRepository.getDealDocumentById(docId);
-    
+
     if (!document) {
       res.status(404).json({ error: "Document not found" });
       return;
     }
-    
-    res.json(document);
+
+    // Only generate PDF for quotes and invoices
+    if (document.document_type !== 'quote' && document.document_type !== 'invoice') {
+      res.status(400).json({ error: "PDF generation only available for quotes and invoices" });
+      return;
+    }
+
+    const html = generateSimplePDF(document);
+
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(html);
   } catch (error) {
-    console.error("Error fetching document:", error);
-    res.status(500).json({ error: "Failed to fetch document" });
+    console.error("Error generating PDF:", error);
+    res.status(500).json({ error: "Failed to generate PDF" });
   }
 });
 
@@ -357,21 +521,46 @@ router.get("/api/deals/:dealId/documents/:docId", async (req, res) => {
 router.post("/api/deals/:id/documents", async (req, res) => {
   try {
     const { id } = req.params;
-    
+    const userId = req.headers["x-user-id"] as string;
+
+    console.log(`📄 [Documents] Creating document for deal ${id}, type: ${req.body.document_type}`);
+    console.log(`📄 [Documents] Request body:`, JSON.stringify(req.body, null, 2));
+
     const validationResult = insertDealDocumentSchema.safeParse({
       ...req.body,
       deal_id: id
     });
-    
+
     if (!validationResult.success) {
       const errorMessage = fromZodError(validationResult.error).toString();
-      console.error("Validation error for deal document:", errorMessage);
-      console.error("Request body:", JSON.stringify(req.body, null, 2));
+      console.error("[Documents] Validation error for deal document:", errorMessage);
+      console.error("[Documents] Request body:", JSON.stringify(req.body, null, 2));
       res.status(400).json({ error: errorMessage });
       return;
     }
-    
+
+    console.log(`📄 [Documents] Validated data:`, JSON.stringify(validationResult.data, null, 2));
+
     const newDocument = await salesRepository.createDealDocument(validationResult.data);
+    console.log(`✅ [Documents] Created document ${newDocument.id}, type: ${newDocument.document_type}, file_url: ${newDocument.file_url}`);
+
+    // Log activity
+    const docTypeNames: Record<string, string> = {
+      'quote': 'Коммерческое предложение',
+      'invoice': 'Счет',
+      'contract': 'Договор',
+      'other': 'Документ'
+    };
+    const docTypeName = docTypeNames[newDocument.document_type] || 'Документ';
+
+    await activityLogsRepository.logActivity({
+      entity_type: "deal",
+      entity_id: id,
+      action_type: "created",
+      user_id: userId,
+      description: `Добавлен документ: ${docTypeName} "${newDocument.title}"`,
+    });
+
     res.status(201).json(newDocument);
   } catch (error) {
     console.error("Error creating deal document:", error);
@@ -409,11 +598,116 @@ router.put("/api/deals/:dealId/documents/:docId", async (req, res) => {
 // DELETE /api/deals/:dealId/documents/:docId - удалить документ
 router.delete("/api/deals/:dealId/documents/:docId", async (req, res) => {
   try {
-    const { docId } = req.params;
-    await salesRepository.deleteDealDocument(docId);
+    const { dealId, docId } = req.params;
+    const userId = req.headers["x-user-id"] as string;
+
+    // Get document info before deleting
+    const document = await salesRepository.getDealDocument(docId);
+
+    if (document) {
+      await salesRepository.deleteDealDocument(docId);
+
+      // Log activity
+      const docTypeNames: Record<string, string> = {
+        'quote': 'Коммерческое предложение',
+        'invoice': 'Счет',
+        'contract': 'Договор',
+        'other': 'Документ'
+      };
+      const docTypeName = docTypeNames[document.document_type] || 'Документ';
+
+      await activityLogsRepository.logActivity({
+        entity_type: "deal",
+        entity_id: dealId,
+        action_type: "deleted",
+        user_id: userId,
+        description: `Удален документ: ${docTypeName} "${document.title}"`,
+      });
+    } else {
+      await salesRepository.deleteDealDocument(docId);
+    }
+
     res.status(204).send();
   } catch (error) {
     console.error("Error deleting document:", error);
     res.status(500).json({ error: "Failed to delete document" });
+  }
+});
+
+// ========== Document Attachments Endpoints ==========
+
+// GET /api/deals/:dealId/documents/:docId/attachments - получить все вложения документа
+router.get("/api/deals/:dealId/documents/:docId/attachments", async (req, res) => {
+  try {
+    const { docId } = req.params;
+    const attachments = await salesRepository.getDocumentAttachments(docId);
+    res.json(attachments);
+  } catch (error) {
+    console.error("Error fetching document attachments:", error);
+    res.status(500).json({ error: "Failed to fetch attachments" });
+  }
+});
+
+// POST /api/deals/:dealId/documents/:docId/attachments - загрузить вложение к документу
+router.post("/api/deals/:dealId/documents/:docId/attachments", async (req, res) => {
+  try {
+    const { dealId, docId } = req.params;
+    const userId = req.headers["x-user-id"] as string;
+    const { file_name, file_path, file_size, mime_type } = req.body;
+
+    const attachment = await salesRepository.createDocumentAttachment({
+      deal_id: dealId,
+      document_id: docId,
+      file_name,
+      file_path,
+      file_size,
+      mime_type,
+      uploaded_by: userId,
+    });
+
+    // Log activity
+    await activityLogsRepository.logActivity({
+      entity_type: "deal",
+      entity_id: dealId,
+      action_type: "created",
+      user_id: userId,
+      description: `Добавлено вложение к документу: ${file_name}`,
+    });
+
+    res.status(201).json(attachment);
+  } catch (error) {
+    console.error("Error creating document attachment:", error);
+    res.status(500).json({ error: "Failed to create attachment" });
+  }
+});
+
+// DELETE /api/deals/:dealId/documents/:docId/attachments/:attachmentId - удалить вложение
+router.delete("/api/deals/:dealId/documents/:docId/attachments/:attachmentId", async (req, res) => {
+  try {
+    const { dealId, attachmentId } = req.params;
+    const userId = req.headers["x-user-id"] as string;
+
+    // Get attachment info before deleting
+    const attachment = await salesRepository.getAttachmentById(attachmentId);
+
+    if (attachment) {
+      await salesRepository.deleteAttachment(attachmentId);
+
+      // Log activity
+      await activityLogsRepository.logActivity({
+        entity_type: "deal",
+        entity_id: dealId,
+        action_type: "deleted",
+        user_id: userId,
+        description: `Удалено вложение документа: ${attachment.file_name}`,
+      });
+    } else {
+      await salesRepository.deleteAttachment(attachmentId);
+    }
+
+    res.status(204).send();
+  } catch (error) {
+    console.error("Error deleting attachment:", error);
+    res.status(500).json({ error: "Failed to delete attachment" });
   }
 });

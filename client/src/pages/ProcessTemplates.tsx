@@ -178,7 +178,7 @@ export default function ProcessTemplates() {
       // First, fetch all existing stages
       const existingResponse = await fetch(`/api/templates/${selectedTemplateId}/stages`);
       const existingStages = await existingResponse.json();
-      
+
       // Delete all existing stages (cascade will delete dependencies)
       for (const stage of existingStages) {
         await apiRequest("DELETE", `/api/templates/stages/${stage.id}`);
@@ -187,32 +187,72 @@ export default function ProcessTemplates() {
       // Create new stages
       const createdStages: Record<string, string> = {};
       for (const stage of stages) {
-        const response = await apiRequest(
-          "POST",
+        // Build stage data, ensuring correct types
+        const stageData = {
+          name: stage.name || "",  // Ensure it's not null
+          order: Number(stage.order_index),  // Ensure it's a number
+          duration_days: stage.duration_days ? Number(stage.duration_days) : undefined,
+          assignee_id: stage.assignee_id || undefined,
+          cost: stage.cost !== undefined && stage.cost !== null ? Number(stage.cost) : undefined,
+          description: stage.description || undefined,
+        };
+
+        console.log(`[SaveStages] Sending stage ${stage.id}:`, {
+          stageName: stage.name,
+          stageOrderIndex: stage.order_index,
+          stageData
+        });
+
+        const response = await fetch(
           `/api/templates/${selectedTemplateId}/stages`,
           {
-            name: stage.name,
-            order: stage.order_index,
-            duration_days: stage.duration_days,
-            assignee_id: stage.assignee_id,
-            cost: stage.cost !== undefined ? String(stage.cost) : undefined,
-            description: stage.description,
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-User-Id": localStorage.getItem("currentUserId") || "",
+            },
+            body: JSON.stringify(stageData),
+            credentials: "include",
           }
         );
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error(`[SaveStages] Error creating stage ${stage.id}:`, errorData);
+          throw new Error(`Failed to create stage ${stage.name}: ${JSON.stringify(errorData)}`);
+        }
+
         const data = await response.json();
+        console.log(`[SaveStages] Successfully created stage ${stage.id} -> ${data.id}`);
         createdStages[stage.id] = data.id;
       }
 
       // Create dependencies with new IDs
       for (const dep of dependencies) {
-        await apiRequest(
-          "POST",
+        const depData = {
+          template_stage_id: createdStages[dep.stage_id],
+          depends_on_template_stage_id: createdStages[dep.depends_on_stage_id],
+        };
+        console.log(`[SaveStages] Creating dependency:`, depData);
+
+        const depResponse = await fetch(
           `/api/templates/${selectedTemplateId}/dependencies`,
           {
-            template_stage_id: createdStages[dep.stage_id],
-            depends_on_template_stage_id: createdStages[dep.depends_on_stage_id],
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-User-Id": localStorage.getItem("currentUserId") || "",
+            },
+            body: JSON.stringify(depData),
+            credentials: "include",
           }
         );
+
+        if (!depResponse.ok) {
+          const errorData = await depResponse.json();
+          console.error(`[SaveStages] Error creating dependency:`, errorData);
+          throw new Error(`Failed to create dependency: ${JSON.stringify(errorData)}`);
+        }
       }
 
       queryClient.invalidateQueries({ queryKey: ["/api/templates"] });
@@ -223,7 +263,9 @@ export default function ProcessTemplates() {
       setStages([]);
       setDependencies([]);
     } catch (error) {
-      toast({ description: "Ошибка при сохранении этапов", variant: "destructive" });
+      const errorMessage = error instanceof Error ? error.message : "Неизвестная ошибка";
+      console.error("[SaveStages] Fatal error:", errorMessage);
+      toast({ description: `Ошибка при сохранении этапов: ${errorMessage}`, variant: "destructive" });
     }
   };
 

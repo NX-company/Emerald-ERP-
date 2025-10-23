@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -9,8 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Plus, Trash2 } from "lucide-react";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Plus, Trash2, Image as ImageIcon, X, ZoomIn } from "lucide-react";
+import { apiRequest, queryClient, getCurrentUserId } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { DealDocument } from "@shared/schema";
 
@@ -18,6 +18,7 @@ const positionSchema = z.object({
   name: z.string().min(1, "Введите название"),
   price: z.coerce.number().min(0, "Цена должна быть больше 0"),
   quantity: z.coerce.number().min(1, "Количество должно быть больше 0"),
+  imageUrl: z.string().optional(),
 });
 
 const documentFormSchema = z.object({
@@ -53,6 +54,8 @@ export function DocumentFormDialog({
 }: DocumentFormDialogProps) {
   const { toast } = useToast();
   const isEditing = !!documentId;
+  const [imagePreview, setImagePreview] = useState<{ url: string; index: number } | null>(null);
+  const positionRefs = useRef<(HTMLTableRowElement | null)[]>([]);
 
   const { data: existingDocuments = [] } = useQuery<DealDocument[]>({
     queryKey: ['/api/deals', dealId, 'documents'],
@@ -62,17 +65,30 @@ export function DocumentFormDialog({
   const { data: editingDocument } = useQuery<DealDocument | undefined>({
     queryKey: ['/api/deals', dealId, 'documents', documentId],
     queryFn: async () => {
-      const docs = await apiRequest('GET', `/api/deals/${dealId}/documents`) as unknown as DealDocument[];
+      // Force bypass HTTP cache to always get fresh data
+      const response = await fetch(`/api/deals/${dealId}/documents`, {
+        method: 'GET',
+        headers: {
+          'X-User-Id': getCurrentUserId(),
+          'Content-Type': 'application/json'
+        },
+        cache: 'no-cache', // Critical: bypass browser HTTP cache
+        credentials: 'include'
+      });
+      const docs = await response.json() as DealDocument[];
       return docs.find((doc: DealDocument) => doc.id === documentId);
     },
     enabled: open && isEditing,
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: 'always',
   });
 
   const form = useForm<DocumentFormData>({
     resolver: zodResolver(documentFormSchema),
     defaultValues: {
       name: "",
-      positions: [{ name: "", price: 0, quantity: 1 }],
+      positions: [{ name: "", price: 0, quantity: 1, imageUrl: undefined }],
       is_signed: false,
     },
   });
@@ -84,26 +100,36 @@ export function DocumentFormDialog({
 
   // Load existing document data when editing
   useEffect(() => {
+    // When opening dialog for editing, invalidate the documents cache first
+    // to ensure we get fresh data
+    if (open && isEditing && documentId) {
+      queryClient.invalidateQueries({ queryKey: ['/api/deals', dealId, 'documents'] });
+    }
+
     if (editingDocument && open) {
-      const docData = editingDocument.data as any;
-      const positions = docData?.positions || [{ name: "", price: 0, quantity: 1 }];
+      // Parse data from JSON string
+      const docData = typeof editingDocument.data === 'string'
+        ? JSON.parse(editingDocument.data)
+        : editingDocument.data as any;
+      const positions = docData?.positions || [{ name: "", price: 0, quantity: 1, imageUrl: undefined }];
       form.reset({
         name: editingDocument.name,
         positions: positions.map((pos: any) => ({
           name: pos.name,
           price: pos.price,
           quantity: pos.quantity,
+          imageUrl: pos.imageUrl || undefined,
         })),
         is_signed: editingDocument.is_signed || false,
       });
     } else if (!isEditing && open) {
       form.reset({
         name: "",
-        positions: [{ name: "", price: 0, quantity: 1 }],
+        positions: [{ name: "", price: 0, quantity: 1, imageUrl: undefined }],
         is_signed: false,
       });
     }
-  }, [editingDocument, open, isEditing, form]);
+  }, [editingDocument, open, isEditing, form, documentId, dealId, queryClient]);
 
   const positions = form.watch("positions");
   
@@ -114,6 +140,39 @@ export function DocumentFormDialog({
   const grandTotal = positions.reduce((sum, pos) => {
     return sum + calculateTotal(pos.price || 0, pos.quantity || 1);
   }, 0);
+
+  // Handle paste image from clipboard
+  const handlePasteImage = async (event: React.ClipboardEvent, index: number) => {
+    const items = event.clipboardData?.items;
+    if (!items) return;
+
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image') !== -1) {
+        event.preventDefault();
+        const file = items[i].getAsFile();
+        if (!file) continue;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const base64 = e.target?.result as string;
+          form.setValue(`positions.${index}.imageUrl`, base64);
+          toast({
+            title: "Изображение добавлено",
+            description: "Изображение успешно вставлено из буфера обмена",
+          });
+        };
+        reader.readAsDataURL(file);
+        break;
+      }
+    }
+  };
+
+  const handleRemoveImage = (index: number) => {
+    form.setValue(`positions.${index}.imageUrl`, undefined);
+    toast({
+      title: "Изображение удалено",
+    });
+  };
 
   const saveDocument = useMutation({
     mutationFn: async (data: DocumentFormData) => {
@@ -126,8 +185,8 @@ export function DocumentFormDialog({
         // Update existing document
         return await apiRequest('PUT', `/api/deals/${dealId}/documents/${documentId}`, {
           name: data.name,
-          data: { positions: positionsWithTotal },
-          total_amount: grandTotal.toString(),
+          data: JSON.stringify({ positions: positionsWithTotal }),
+          total_amount: grandTotal,
           is_signed: documentType === 'contract' ? data.is_signed : undefined,
         });
       } else {
@@ -149,8 +208,8 @@ export function DocumentFormDialog({
           name: data.name,
           version: version,
           file_url: `placeholder-${Date.now()}`,
-          data: { positions: positionsWithTotal },
-          total_amount: grandTotal.toString(),
+          data: JSON.stringify({ positions: positionsWithTotal }),
+          total_amount: grandTotal,
           is_signed: documentType === 'contract' ? data.is_signed : false,
         });
       }
@@ -211,7 +270,7 @@ export function DocumentFormDialog({
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => append({ name: "", price: 0, quantity: 1 })}
+                  onClick={() => append({ name: "", price: 0, quantity: 1, imageUrl: undefined })}
                   data-testid="button-add-position"
                 >
                   <Plus className="w-4 h-4 mr-1" />
@@ -227,12 +286,19 @@ export function DocumentFormDialog({
                       <TableHead className="w-32">Цена</TableHead>
                       <TableHead className="w-32">Кол-во</TableHead>
                       <TableHead className="w-32">Итого</TableHead>
+                      <TableHead className="w-20">Фото</TableHead>
                       <TableHead className="w-16"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {fields.map((field, index) => (
-                      <TableRow key={field.id} data-testid={`position-row-${index}`}>
+                      <TableRow
+                        key={field.id}
+                        data-testid={`position-row-${index}`}
+                        ref={(el) => (positionRefs.current[index] = el)}
+                        onPaste={(e) => handlePasteImage(e, index)}
+                        tabIndex={-1}
+                      >
                         <TableCell>
                           <FormField
                             control={form.control}
@@ -297,6 +363,40 @@ export function DocumentFormDialog({
                             positions[index]?.price || 0,
                             positions[index]?.quantity || 1
                           ).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₽
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center justify-center gap-1">
+                            {positions[index]?.imageUrl ? (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => setImagePreview({ url: positions[index].imageUrl!, index })}
+                                  className="relative w-8 h-8 rounded border hover:border-primary transition-colors"
+                                >
+                                  <img
+                                    src={positions[index].imageUrl}
+                                    alt="Preview"
+                                    className="w-full h-full object-cover rounded"
+                                  />
+                                  <ZoomIn className="absolute inset-0 m-auto w-4 h-4 text-white opacity-0 hover:opacity-100 transition-opacity" />
+                                </button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6"
+                                  onClick={() => handleRemoveImage(index)}
+                                >
+                                  <X className="w-3 h-3" />
+                                </Button>
+                              </>
+                            ) : (
+                              <div className="text-xs text-muted-foreground flex items-center gap-1">
+                                <ImageIcon className="w-3 h-3" />
+                                Ctrl+V
+                              </div>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell>
                           <Button
@@ -364,6 +464,38 @@ export function DocumentFormDialog({
           </form>
         </Form>
       </DialogContent>
+
+      {/* Image Preview Dialog */}
+      {imagePreview && (
+        <Dialog open={!!imagePreview} onOpenChange={() => setImagePreview(null)}>
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle>Изображение позиции</DialogTitle>
+            </DialogHeader>
+            <div className="flex items-center justify-center p-4">
+              <img
+                src={imagePreview.url}
+                alt="Preview"
+                className="max-w-full max-h-[70vh] object-contain rounded"
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setImagePreview(null)}>
+                Закрыть
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  handleRemoveImage(imagePreview.index);
+                  setImagePreview(null);
+                }}
+              >
+                Удалить
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </Dialog>
   );
 }

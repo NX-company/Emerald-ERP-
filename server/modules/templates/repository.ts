@@ -1,14 +1,16 @@
 import { db } from "../../db";
 import { eq, and, asc } from "drizzle-orm";
-import type { 
+import type {
   ProcessTemplate, InsertProcessTemplate,
   TemplateStage, InsertTemplateStage,
-  TemplateDependency, InsertTemplateDependency
+  TemplateDependency, InsertTemplateDependency,
+  TemplateStageAttachment, InsertTemplateStageAttachment
 } from "@shared/schema";
-import { 
-  process_templates, 
+import {
+  process_templates,
   template_stages,
-  template_dependencies
+  template_dependencies,
+  template_stage_attachments
 } from "@shared/schema";
 
 export class TemplatesRepository {
@@ -109,6 +111,38 @@ export class TemplatesRepository {
           eq(template_dependencies.template_stage_id, stageId)
         )
       );
+  }
+
+  // Template stage attachments methods
+  async getStageAttachments(stageId: string): Promise<TemplateStageAttachment[]> {
+    return await db.select()
+      .from(template_stage_attachments)
+      .where(eq(template_stage_attachments.template_stage_id, stageId))
+      .orderBy(asc(template_stage_attachments.created_at));
+  }
+
+  async getAttachmentById(id: string): Promise<TemplateStageAttachment | undefined> {
+    const result = await db.select()
+      .from(template_stage_attachments)
+      .where(eq(template_stage_attachments.id, id));
+    return result[0];
+  }
+
+  async createStageAttachment(data: InsertTemplateStageAttachment): Promise<TemplateStageAttachment> {
+    const result = await db.insert(template_stage_attachments).values(data).returning();
+    return result[0];
+  }
+
+  async deleteStageAttachment(id: string): Promise<boolean> {
+    const result = await db.delete(template_stage_attachments)
+      .where(eq(template_stage_attachments.id, id))
+      .returning();
+    return result.length > 0;
+  }
+
+  async deleteStageAttachmentsByStageId(stageId: string): Promise<void> {
+    await db.delete(template_stage_attachments)
+      .where(eq(template_stage_attachments.template_stage_id, stageId));
   }
 
   // Get template with all its data

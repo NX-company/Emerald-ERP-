@@ -1,9 +1,13 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import { templatesRepository } from "./repository";
-import { 
-  insertProcessTemplateSchema, 
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+import { z } from "zod";
+import {
+  insertProcessTemplateSchema,
   insertTemplateStageSchema,
-  insertTemplateDependencySchema 
+  insertTemplateDependencySchema
 } from "@shared/schema";
 
 export const router = Router();
@@ -98,15 +102,54 @@ router.get("/api/templates/:templateId/stages", async (req, res) => {
 
 router.post("/api/templates/:templateId/stages", async (req, res) => {
   try {
-    const validatedData = insertTemplateStageSchema.parse({
+    const dataWithTemplateId = {
       ...req.body,
       template_id: req.params.templateId
-    });
+    };
+    console.log("=== TEMPLATE STAGE CREATION ===");
+    console.log("Request body:", JSON.stringify(req.body, null, 2));
+    console.log("Template ID:", req.params.templateId);
+    console.log("Data with template_id:", JSON.stringify(dataWithTemplateId, null, 2));
+
+    const validatedData = insertTemplateStageSchema.parse(dataWithTemplateId);
+    console.log("✓ Validation passed");
+    console.log("Validated data:", JSON.stringify(validatedData, null, 2));
+
     const stage = await templatesRepository.createTemplateStage(validatedData);
+    console.log("✓ Stage created successfully:", stage.id);
     res.status(201).json(stage);
   } catch (error) {
-    console.error("Error creating template stage:", error);
-    res.status(400).json({ error: "Failed to create template stage" });
+    console.error("✗ Error creating template stage");
+
+    if (error instanceof z.ZodError) {
+      console.error("Validation FAILED - Zod Error");
+      console.error("Number of errors:", error.errors.length);
+      error.errors.forEach((err, idx) => {
+        console.error(`Error ${idx}:`, {
+          path: err.path,
+          code: err.code,
+          message: err.message,
+          expected: (err as any).expected,
+          received: (err as any).received,
+        });
+      });
+      return res.status(400).json({
+        error: "Validation failed",
+        errorCount: error.errors.length,
+        errors: error.errors.map(e => ({
+          path: e.path.join('.'),
+          code: e.code,
+          message: e.message
+        })),
+        receivedData: req.body
+      });
+    }
+    console.error("Error type:", error instanceof Error ? "Error" : "Unknown");
+    console.error("Error message:", error instanceof Error ? error.message : String(error));
+    res.status(400).json({
+      error: "Failed to create template stage",
+      details: error instanceof Error ? error.message : String(error)
+    });
   }
 });
 
@@ -170,5 +213,123 @@ router.delete("/api/templates/dependencies/:id", async (req, res) => {
   } catch (error) {
     console.error("Error deleting template dependency:", error);
     res.status(500).json({ error: "Failed to delete template dependency" });
+  }
+});
+
+// Configure multer for file uploads
+const uploadDir = path.join(process.cwd(), "uploads", "template-attachments");
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  },
+});
+
+const fileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+  // Allow PDF, Word, and Excel files
+  const allowedMimes = [
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ];
+
+  if (allowedMimes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error("Only PDF, Word, and Excel files are allowed"));
+  }
+};
+
+const upload = multer({ storage, fileFilter });
+
+// Template stage attachments routes
+
+// GET /api/templates/stages/:stageId/attachments - Get attachments for a stage
+router.get("/api/templates/stages/:stageId/attachments", async (req: Request, res: Response) => {
+  try {
+    const attachments = await templatesRepository.getStageAttachments(req.params.stageId);
+    res.json(attachments);
+  } catch (error) {
+    console.error("Error fetching stage attachments:", error);
+    res.status(500).json({ error: "Failed to fetch stage attachments" });
+  }
+});
+
+// POST /api/templates/stages/:stageId/attachments - Upload attachment
+router.post("/api/templates/stages/:stageId/attachments", upload.single("file"), async (req: Request, res: Response) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "No file provided" });
+    }
+
+    const attachment = await templatesRepository.createStageAttachment({
+      template_stage_id: req.params.stageId,
+      file_name: req.file.originalname,
+      file_path: `/uploads/template-attachments/${req.file.filename}`,
+      file_size: req.file.size,
+      mime_type: req.file.mimetype,
+      uploaded_by: (req as any).userId, // Assumes auth middleware sets userId
+    });
+
+    res.status(201).json(attachment);
+  } catch (error) {
+    console.error("Error uploading attachment:", error);
+    res.status(500).json({ error: "Failed to upload attachment" });
+  }
+});
+
+// DELETE /api/templates/stages/:stageId/attachments/:attachmentId - Delete attachment
+router.delete("/api/templates/stages/:stageId/attachments/:attachmentId", async (req: Request, res: Response) => {
+  try {
+    const attachment = await templatesRepository.getAttachmentById(req.params.attachmentId);
+    if (!attachment) {
+      return res.status(404).json({ error: "Attachment not found" });
+    }
+
+    // Delete file from storage
+    const filePath = path.join(process.cwd(), attachment.file_path);
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+
+    // Delete from database
+    const deleted = await templatesRepository.deleteStageAttachment(req.params.attachmentId);
+    if (!deleted) {
+      return res.status(404).json({ error: "Attachment not found" });
+    }
+
+    res.status(204).send();
+  } catch (error) {
+    console.error("Error deleting attachment:", error);
+    res.status(500).json({ error: "Failed to delete attachment" });
+  }
+});
+
+// GET /api/templates/stages/:stageId/attachments/:attachmentId/download - Download attachment
+router.get("/api/templates/stages/:stageId/attachments/:attachmentId/download", async (req: Request, res: Response) => {
+  try {
+    const attachment = await templatesRepository.getAttachmentById(req.params.attachmentId);
+    if (!attachment) {
+      return res.status(404).json({ error: "Attachment not found" });
+    }
+
+    const filePath = path.join(process.cwd(), attachment.file_path);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: "File not found" });
+    }
+
+    res.download(filePath, attachment.file_name);
+  } catch (error) {
+    console.error("Error downloading attachment:", error);
+    res.status(500).json({ error: "Failed to download attachment" });
   }
 });
