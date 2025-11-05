@@ -66,7 +66,8 @@ router.get("/api/users/:id", async (req, res) => {
     const permissions = await usersRepository.getUserPermissions(user.role_id);
 
     // Check specific permissions for deals and projects
-    const salesPerms = permissions.find(p => p.module === 'sales');
+    // Support both 'sales' and 'deals' module names for compatibility
+    const salesPerms = permissions.find(p => p.module === 'sales' || p.module === 'deals');
     const projectsPerms = permissions.find(p => p.module === 'projects');
 
     res.json({

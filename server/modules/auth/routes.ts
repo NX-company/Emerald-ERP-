@@ -64,7 +64,8 @@ router.post("/api/auth/login", async (req, res) => {
     const { password: _, ...userWithoutPassword } = user;
 
     // Map permissions to boolean flags for frontend
-    const salesPerms = permissions.find(p => p.module === 'sales');
+    // Support both 'sales' and 'deals' module names for compatibility
+    const salesPerms = permissions.find(p => p.module === 'sales' || p.module === 'deals');
     const projectsPerms = permissions.find(p => p.module === 'projects');
 
     res.json({
