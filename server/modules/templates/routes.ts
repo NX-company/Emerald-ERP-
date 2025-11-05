@@ -37,13 +37,25 @@ router.get("/api/templates/active", async (req, res) => {
 // Get template by ID with details
 router.get("/api/templates/:id", async (req, res) => {
   try {
+    console.log(`[API] Fetching template: ${req.params.id}`);
+
     const template = await templatesRepository.getTemplateWithDetails(req.params.id);
+
     if (!template) {
+      console.log(`[API] Template not found: ${req.params.id}`);
       return res.status(404).json({ error: "Template not found" });
     }
+
+    console.log(`[API] Returning template response:`, {
+      hasTemplate: !!template.template,
+      templateName: template.template?.name,
+      stagesCount: template.stages?.length || 0,
+      dependenciesCount: template.dependencies?.length || 0
+    });
+
     res.json(template);
   } catch (error) {
-    console.error("Error fetching template:", error);
+    console.error("[API] Error fetching template:", error);
     res.status(500).json({ error: "Failed to fetch template" });
   }
 });

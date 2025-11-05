@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Plus, Search } from "lucide-react";
@@ -27,13 +27,15 @@ export default function Warehouse() {
     queryKey: ["/api/users"],
   });
 
-  if (error) {
-    toast({
-      title: "Ошибка загрузки",
-      description: "Не удалось загрузить данные склада",
-      variant: "destructive",
-    });
-  }
+  useEffect(() => {
+    if (error) {
+      toast({
+        title: "Ошибка загрузки",
+        description: "Не удалось загрузить данные склада",
+        variant: "destructive",
+      });
+    }
+  }, [error, toast]);
 
   const currentUserId = users[0]?.id || "";
 

@@ -229,6 +229,7 @@ export const project_items = sqliteTable('project_items', {
   price: real('price'),
   source_document_id: text('source_document_id').references(() => deal_documents.id),
   order: integer('order').notNull(),
+  image_url: text('image_url'),
   created_at: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
   updated_at: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
 });
@@ -242,6 +243,7 @@ export const project_stages = sqliteTable('project_stages', {
   id: text('id').$defaultFn(() => genId()).primaryKey(),
   project_id: text('project_id').references(() => projects.id).notNull(),
   item_id: text('item_id').references(() => project_items.id),
+  stage_type_id: text('stage_type_id').references(() => stage_types.id), // тип этапа из библиотеки
   name: text('name').notNull(),
   status: text('status').notNull().default('pending'),
   assignee_id: text('assignee_id').references(() => users.id),
@@ -252,6 +254,7 @@ export const project_stages = sqliteTable('project_stages', {
   actual_end_date: integer('actual_end_date', { mode: 'timestamp' }),
   cost: real('cost'),
   description: text('description'),
+  type_data: text('type_data'), // JSON данные специфичные для типа этапа
   order: integer('order').notNull(),
   created_at: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
   updated_at: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
@@ -285,6 +288,52 @@ export const stage_messages = sqliteTable('stage_messages', {
 export const insertStageMessageSchema = createInsertSchema(stage_messages).omit({ id: true, created_at: true });
 export type InsertStageMessage = z.infer<typeof insertStageMessageSchema>;
 export type StageMessage = typeof stage_messages.$inferSelect;
+
+// Stage Documents (медиа-файлы этапов)
+export const stage_documents = sqliteTable('stage_documents', {
+  id: text('id').$defaultFn(() => genId()).primaryKey(),
+  stage_id: text('stage_id').references(() => project_stages.id, { onDelete: 'cascade' }).notNull(),
+  media_type: text('media_type').notNull(), // photo, video, audio, document
+  file_name: text('file_name').notNull(),
+  file_path: text('file_path').notNull(),
+  file_size: integer('file_size'),
+  mime_type: text('mime_type'),
+  thumbnail_url: text('thumbnail_url'), // для видео
+  uploaded_by: text('uploaded_by').references(() => users.id),
+  created_at: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
+  updated_at: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
+});
+
+export const insertStageDocumentSchema = createInsertSchema(stage_documents).omit({ id: true, created_at: true, updated_at: true });
+export type InsertStageDocument = z.infer<typeof insertStageDocumentSchema>;
+export type StageDocument = typeof stage_documents.$inferSelect;
+
+// Stage Media Comments (комментарии к медиа-файлам)
+export const stage_media_comments = sqliteTable('stage_media_comments', {
+  id: text('id').$defaultFn(() => genId()).primaryKey(),
+  stage_id: text('stage_id').references(() => project_stages.id, { onDelete: 'cascade' }).notNull(),
+  media_id: text('media_id').references(() => stage_documents.id, { onDelete: 'cascade' }).notNull(),
+  user_id: text('user_id').references(() => users.id).notNull(),
+  comment: text('comment').notNull(),
+  created_at: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
+});
+
+export const insertStageMediaCommentSchema = createInsertSchema(stage_media_comments).omit({ id: true, created_at: true });
+export type InsertStageMediaComment = z.infer<typeof insertStageMediaCommentSchema>;
+export type StageMediaComment = typeof stage_media_comments.$inferSelect;
+
+// Project Messages
+export const project_messages = sqliteTable('project_messages', {
+  id: text('id').$defaultFn(() => genId()).primaryKey(),
+  project_id: text('project_id').references(() => projects.id, { onDelete: 'cascade' }).notNull(),
+  user_id: text('user_id').references(() => users.id).notNull(),
+  message: text('message').notNull(),
+  created_at: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
+});
+
+export const insertProjectMessageSchema = createInsertSchema(project_messages).omit({ id: true, created_at: true });
+export type InsertProjectMessage = z.infer<typeof insertProjectMessageSchema>;
+export type ProjectMessage = typeof project_messages.$inferSelect;
 
 // Production Tasks
 export const production_tasks = sqliteTable('production_tasks', {
@@ -523,6 +572,22 @@ export const insertDealCustomFieldSchema = createInsertSchema(deal_custom_fields
 export type InsertDealCustomField = z.infer<typeof insertDealCustomFieldSchema>;
 export type DealCustomField = typeof deal_custom_fields.$inferSelect;
 
+// Stage Types (библиотека типов этапов)
+export const stage_types = sqliteTable('stage_types', {
+  id: text('id').$defaultFn(() => genId()).primaryKey(),
+  code: text('code').notNull().unique(), // measurement, production, installation, etc.
+  name: text('name').notNull(), // Замер, Производство, Монтаж
+  icon: text('icon'), // emoji или название иконки
+  description: text('description'),
+  is_active: integer('is_active', { mode: 'boolean' }).default(1).notNull(),
+  created_at: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
+  updated_at: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
+});
+
+export const insertStageTypeSchema = createInsertSchema(stage_types).omit({ id: true, created_at: true, updated_at: true });
+export type InsertStageType = z.infer<typeof insertStageTypeSchema>;
+export type StageType = typeof stage_types.$inferSelect;
+
 // Process Templates
 export const process_templates = sqliteTable('process_templates', {
   id: text('id').$defaultFn(() => genId()).primaryKey(),
@@ -542,12 +607,14 @@ export type ProcessTemplate = typeof process_templates.$inferSelect;
 export const template_stages = sqliteTable('template_stages', {
   id: text('id').$defaultFn(() => genId()).primaryKey(),
   template_id: text('template_id').references(() => process_templates.id, { onDelete: 'cascade' }).notNull(),
+  stage_type_id: text('stage_type_id').references(() => stage_types.id), // тип этапа из библиотеки
   name: text('name').notNull(),
   description: text('description'),
   duration_days: integer('duration_days'),
   assignee_id: text('assignee_id').references(() => users.id),
   cost: real('cost'),
   order: integer('order').notNull(),
+  template_data: text('template_data'), // JSON данные специфичные для типа этапа (для шаблонов)
   created_at: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
   updated_at: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
 });

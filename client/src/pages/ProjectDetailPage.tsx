@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -9,17 +9,21 @@ import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { 
-  ArrowLeft, Plus, Edit, Trash2, Calendar, FileText, Layers, 
-  AlertCircle, GripVertical, MessageSquare, Play
+import {
+  ArrowLeft, Plus, Edit, Trash2, Calendar, FileText, Layers,
+  AlertCircle, GripVertical, MessageSquare, Play, ImageIcon
 } from "lucide-react";
 import { ProjectItemDialog } from "@/components/ProjectItemDialog";
 import { StageDialog } from "@/components/StageDialog";
 import { StageFlowEditor } from "@/components/StageFlowEditor";
+import { StageDetailView } from "@/components/StageDetailView";
 import { StatusBadge } from "@/components/StatusBadge";
 import { GanttChart } from "@/components/GanttChart";
 import { ProjectTimeline } from "@/components/ProjectTimeline";
 import { ProjectBusinessProcesses } from "@/components/ProjectBusinessProcesses";
+import { ProjectChat } from "@/components/ProjectChat";
+import { ProjectActivityLog } from "@/components/ProjectActivityLog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Project, ProjectItem, ProjectStage, User } from "@shared/schema";
@@ -182,14 +186,36 @@ export default function ProjectDetailPage() {
   const [editingItem, setEditingItem] = useState<ProjectItem | undefined>();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
-  
+
   // Stage dialog state
   const [stageDialogOpen, setStageDialogOpen] = useState(false);
   const [editingStage, setEditingStage] = useState<ProjectStage | undefined>();
   const [deleteStageDialogOpen, setDeleteStageDialogOpen] = useState(false);
   const [stageToDelete, setStageToDelete] = useState<string | null>(null);
 
-  const { data: project, isLoading: projectLoading } = useQuery<Project & { stages: ProjectStage[] }>({
+  // Stage details sheet state
+  const [detailsSheetOpen, setDetailsSheetOpen] = useState(false);
+  const [selectedStageForDetails, setSelectedStageForDetails] = useState<ProjectStage | undefined>();
+
+  // Project delete dialog state
+  const [deleteProjectDialogOpen, setDeleteProjectDialogOpen] = useState(false);
+
+  // Блокировка доступа для замерщиков
+  useEffect(() => {
+    const userRoleStr = localStorage.getItem("userRole");
+    if (userRoleStr) {
+      const userRole = JSON.parse(userRoleStr);
+      if (userRole?.name === 'Замерщик') {
+        toast({
+          description: "У вас нет доступа к этой странице",
+          variant: "destructive",
+        });
+        setLocation("/projects");
+      }
+    }
+  }, [toast, setLocation]);
+
+  const { data: project, isLoading: projectLoading} = useQuery<Project & { stages: ProjectStage[] }>({
     queryKey: ['/api/projects', id],
     enabled: !!id,
   });
@@ -286,6 +312,11 @@ export default function ProjectDetailPage() {
     setDeleteStageDialogOpen(true);
   };
 
+  const handleViewDetails = (stage: ProjectStage) => {
+    setSelectedStageForDetails(stage);
+    setDetailsSheetOpen(true);
+  };
+
   const deleteStage = useMutation({
     mutationFn: async (stageId: string) => {
       return await apiRequest('DELETE', `/api/projects/stages/${stageId}`);
@@ -363,7 +394,7 @@ export default function ProjectDetailPage() {
 
     const oldIndex = stages.findIndex(s => s.id === active.id);
     const newIndex = stages.findIndex(s => s.id === over.id);
-    
+
     // Optimistic update
     const reordered = arrayMove(stages, oldIndex, newIndex);
     queryClient.setQueryData(
@@ -374,6 +405,31 @@ export default function ProjectDetailPage() {
     // Single atomic API call
     reorderStages.mutate(reordered.map(s => s.id));
   };
+
+  const deleteProjectMutation = useMutation({
+    mutationFn: async () => {
+      const userStr = localStorage.getItem("user");
+      const currentUser = userStr ? JSON.parse(userStr) : null;
+      await apiRequest("DELETE", `/api/projects/${id}`, {
+        user_id: currentUser?.id,
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Проект удалён",
+        description: "Проект и все связанные данные успешно удалены",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/projects'] });
+      setLocation("/projects");
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Ошибка",
+        description: error.message || "Не удалось удалить проект",
+        variant: "destructive",
+      });
+    },
+  });
 
   const selectedItem = items.find(item => item.id === selectedItemId);
   const sortedStages = [...stages].sort((a, b) => a.order - b.order);
@@ -459,6 +515,14 @@ export default function ProjectDetailPage() {
                     Запустить проект
                   </Button>
                 )}
+                <Button
+                  variant="destructive"
+                  size="icon"
+                  onClick={() => setDeleteProjectDialogOpen(true)}
+                  data-testid="button-delete-project"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
               </div>
             </div>
 
@@ -608,38 +672,52 @@ export default function ProjectDetailPage() {
                     onClick={() => setSelectedItemId(item.id)}
                     data-testid={`card-item-${item.id}`}
                   >
-                    <div className="space-y-1">
-                      <p className="font-medium text-sm" data-testid={`text-item-name-${item.id}`}>
-                        {item.name}
-                      </p>
-                      {item.article && (
-                        <p className="text-xs text-muted-foreground" data-testid={`text-item-article-${item.id}`}>
-                          Арт: {item.article}
-                        </p>
+                    <div className="flex gap-3">
+                      {item.image_url ? (
+                        <img
+                          src={item.image_url}
+                          alt={item.name}
+                          className="w-16 h-16 object-cover rounded flex-shrink-0"
+                          data-testid={`image-item-${item.id}`}
+                        />
+                      ) : (
+                        <div className="w-16 h-16 flex items-center justify-center bg-muted rounded flex-shrink-0">
+                          <ImageIcon className="w-8 h-8 text-muted-foreground" />
+                        </div>
                       )}
-                    </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="space-y-1">
+                          <p className="font-medium text-sm" data-testid={`text-item-name-${item.id}`}>
+                            {item.name}
+                          </p>
+                          {item.article && (
+                            <p className="text-xs text-muted-foreground" data-testid={`text-item-article-${item.id}`}>
+                              Арт: {item.article}
+                            </p>
+                          )}
+                        </div>
 
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground" data-testid={`text-item-quantity-${item.id}`}>
-                        {item.quantity} шт
-                      </span>
-                      {item.price && (
-                        <span className="text-muted-foreground" data-testid={`text-item-price-${item.id}`}>
-                          × {formatCurrency(item.price)}
-                        </span>
-                      )}
-                    </div>
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-muted-foreground" data-testid={`text-item-quantity-${item.id}`}>
+                            {item.quantity} шт
+                          </span>
+                          {item.price && (
+                            <span className="text-muted-foreground" data-testid={`text-item-price-${item.id}`}>
+                              × {formatCurrency(item.price)}
+                            </span>
+                          )}
+                        </div>
 
-                    {item.price && (
-                      <div className="flex items-center justify-between pt-2 border-t">
-                        <span className="text-xs text-muted-foreground">Итого:</span>
-                        <span className="font-semibold text-sm" data-testid={`text-item-total-${item.id}`}>
-                          {formatCurrency((parseFloat(item.price) * item.quantity).toString())}
-                        </span>
-                      </div>
-                    )}
+                        {item.price && (
+                          <div className="flex items-center justify-between pt-2 border-t">
+                            <span className="text-xs text-muted-foreground">Итого:</span>
+                            <span className="font-semibold text-sm" data-testid={`text-item-total-${item.id}`}>
+                              {formatCurrency((parseFloat(item.price) * item.quantity).toString())}
+                            </span>
+                          </div>
+                        )}
 
-                    <div className="flex items-center gap-1 pt-2">
+                        <div className="flex items-center gap-1 pt-2">
                       <Button
                         size="sm"
                         variant="outline"
@@ -664,6 +742,8 @@ export default function ProjectDetailPage() {
                         <Trash2 className="w-3 h-3 mr-1" />
                         Удалить
                       </Button>
+                        </div>
+                      </div>
                     </div>
 
                     <Tooltip>
@@ -694,35 +774,21 @@ export default function ProjectDetailPage() {
 
         {/* Right Panel - Tabs */}
         <Card className="p-6">
-          <Tabs defaultValue="constructor" className="w-full">
+          <Tabs defaultValue="processes" className="w-full">
             <TabsList className="w-full justify-start" data-testid="tabs-list">
-              <TabsTrigger value="constructor" data-testid="tab-constructor">
-                Конструктор
+              <TabsTrigger value="processes" data-testid="tab-processes">
+                Бизнес-процессы
               </TabsTrigger>
               <TabsTrigger value="gantt" data-testid="tab-gantt">
                 Диаграмма Ганта
               </TabsTrigger>
-              <TabsTrigger value="processes" data-testid="tab-processes">
-                Бизнес-процессы
+              <TabsTrigger value="chat" data-testid="tab-chat">
+                Чат проекта
+              </TabsTrigger>
+              <TabsTrigger value="events" data-testid="tab-events">
+                События
               </TabsTrigger>
             </TabsList>
-
-            <TabsContent value="constructor" className="mt-6" data-testid="content-constructor">
-              {!selectedItem ? (
-                <div className="text-center py-12 space-y-2">
-                  <AlertCircle className="w-12 h-12 mx-auto text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground" data-testid="text-no-selection">
-                    Выберите позицию слева для управления этапами
-                  </p>
-                </div>
-              ) : (
-                <StageFlowEditor
-                  projectId={id}
-                  itemId={selectedItem.id}
-                  itemName={selectedItem.name}
-                />
-              )}
-            </TabsContent>
 
             <TabsContent value="gantt" className="mt-6 space-y-4" data-testid="content-gantt">
               <ProjectTimeline projectId={id!} />
@@ -730,7 +796,15 @@ export default function ProjectDetailPage() {
             </TabsContent>
 
             <TabsContent value="processes" className="mt-6" data-testid="content-processes">
-              <ProjectBusinessProcesses projectId={id!} />
+              <ProjectBusinessProcesses projectId={id!} selectedItemId={selectedItemId} />
+            </TabsContent>
+
+            <TabsContent value="chat" className="mt-6" data-testid="content-chat">
+              <ProjectChat projectId={id!} />
+            </TabsContent>
+
+            <TabsContent value="events" className="mt-6" data-testid="content-events">
+              <ProjectActivityLog projectId={id!} />
             </TabsContent>
           </Tabs>
         </Card>
@@ -796,6 +870,70 @@ export default function ProjectDetailPage() {
               data-testid="button-confirm-delete-stage"
             >
               {deleteStage.isPending ? "Удаление..." : "Удалить"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Stage Details Sheet */}
+      <Sheet open={detailsSheetOpen} onOpenChange={setDetailsSheetOpen}>
+        <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>{selectedStageForDetails?.name || "Детали этапа"}</SheetTitle>
+          </SheetHeader>
+          {selectedStageForDetails && (
+            <div className="mt-6">
+              <StageDetailView
+                stageId={selectedStageForDetails.id}
+                stageName={selectedStageForDetails.name}
+                stageStatus={selectedStageForDetails.status}
+                stageDescription={selectedStageForDetails.description || undefined}
+                stageDeadline={selectedStageForDetails.planned_end_date ? new Date(selectedStageForDetails.planned_end_date).toISOString() : undefined}
+                stageCost={selectedStageForDetails.cost || undefined}
+                projectId={id}
+                onStatusChange={() => {
+                  if (selectedItemId) {
+                    queryClient.invalidateQueries({ queryKey: ['/api/projects', id, 'items', selectedItemId, 'stages'] });
+                  }
+                  queryClient.invalidateQueries({ queryKey: ['/api/projects', id] });
+                }}
+              />
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
+
+      {/* Delete Project Dialog */}
+      <AlertDialog open={deleteProjectDialogOpen} onOpenChange={setDeleteProjectDialogOpen}>
+        <AlertDialogContent data-testid="dialog-delete-project">
+          <AlertDialogHeader>
+            <AlertDialogTitle data-testid="text-delete-project-title">
+              Удалить проект?
+            </AlertDialogTitle>
+            <AlertDialogDescription data-testid="text-delete-project-description">
+              <div className="space-y-2">
+                <p>Это действие нельзя отменить. Будут удалены:</p>
+                <ul className="list-disc list-inside space-y-1 text-sm">
+                  <li>Проект "{project?.name}"</li>
+                  <li>Все позиции мебели ({items.length})</li>
+                  <li>Все этапы и зависимости</li>
+                  <li>Все документы</li>
+                  <li>Вся история изменений</li>
+                </ul>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-project">
+              Отмена
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteProjectMutation.mutate()}
+              disabled={deleteProjectMutation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-delete-project"
+            >
+              {deleteProjectMutation.isPending ? "Удаление..." : "Удалить проект"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

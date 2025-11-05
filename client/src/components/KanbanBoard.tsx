@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ReactNode } from "react";
 import {
   DndContext,
@@ -35,6 +36,9 @@ interface KanbanBoardProps {
   onDragOver: (event: DragOverEvent) => void;
   onDragEnd: (event: DragEndEvent) => void;
   activeItem?: ReactNode;
+  selectionMode?: boolean;
+  selectedItems?: Set<string>;
+  onToggleColumnSelection?: (columnId: string) => void;
 }
 
 interface SortableItemProps {
@@ -71,19 +75,48 @@ interface DroppableColumnProps {
   count: number;
   color?: string;
   items: { id: string; content: ReactNode }[];
+  selectionMode?: boolean;
+  selectedItems?: Set<string>;
+  onToggleColumnSelection?: (columnId: string) => void;
 }
 
-function DroppableColumn({ id, title, count, color, items }: DroppableColumnProps) {
+function DroppableColumn({
+  id, title, count, color, items,
+  selectionMode, selectedItems, onToggleColumnSelection
+}: DroppableColumnProps) {
   const { setNodeRef } = useSortable({ id });
+
+  // Вычисление состояния чекбокса колонки
+  const columnItemIds = items.map(item => item.id);
+  const selectedInColumn = columnItemIds.filter(itemId =>
+    selectedItems?.has(itemId)
+  ).length;
+
+  const isAllSelected = selectedInColumn === columnItemIds.length && columnItemIds.length > 0;
+  const isIndeterminate = selectedInColumn > 0 && selectedInColumn < columnItemIds.length;
 
   return (
     <div ref={setNodeRef} className="flex-shrink-0 w-72 md:w-80 snap-start" data-testid={`column-${id}`}>
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
+            {selectionMode && (
+              <Checkbox
+                checked={isAllSelected}
+                ref={(el) => {
+                  if (el) {
+                    el.indeterminate = isIndeterminate;
+                  }
+                }}
+                onCheckedChange={() => onToggleColumnSelection?.(id)}
+                className="mt-0.5"
+                data-testid={`checkbox-column-${id}`}
+              />
+            )}
+
             {color && (
-              <div 
-                className="w-1 h-6 rounded-full" 
+              <div
+                className="w-1 h-6 rounded-full"
                 style={{ backgroundColor: color }}
                 data-testid={`color-indicator-${id}`}
               />
@@ -108,13 +141,16 @@ function DroppableColumn({ id, title, count, color, items }: DroppableColumnProp
   );
 }
 
-export function KanbanBoard({ 
-  columns, 
-  activeId, 
-  onDragStart, 
-  onDragOver, 
+export function KanbanBoard({
+  columns,
+  activeId,
+  onDragStart,
+  onDragOver,
   onDragEnd,
-  activeItem 
+  activeItem,
+  selectionMode,
+  selectedItems,
+  onToggleColumnSelection
 }: KanbanBoardProps) {
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -145,6 +181,9 @@ export function KanbanBoard({
               count={column.count}
               color={column.color}
               items={column.items}
+              selectionMode={selectionMode}
+              selectedItems={selectedItems}
+              onToggleColumnSelection={onToggleColumnSelection}
             />
           ))}
         </SortableContext>

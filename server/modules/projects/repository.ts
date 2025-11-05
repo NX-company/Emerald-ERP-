@@ -1,20 +1,21 @@
 import { db } from "../../db";
 import { eq, asc } from "drizzle-orm";
-import type { 
-  Project, InsertProject, 
-  ProjectStage, InsertProjectStage, 
+import type {
+  Project, InsertProject,
+  ProjectStage, InsertProjectStage,
   ProjectItem, InsertProjectItem,
   StageDependency, InsertStageDependency,
   ProcessTemplate, InsertProcessTemplate,
   TemplateStage, InsertTemplateStage,
   TemplateDependency, InsertTemplateDependency,
   StageMessage, InsertStageMessage,
+  ProjectMessage, InsertProjectMessage,
   Document
 } from "@shared/schema";
-import { 
+import {
   projects, project_stages, project_items,
   stage_dependencies, process_templates, template_stages,
-  template_dependencies, stage_messages, documents, users
+  template_dependencies, stage_messages, project_messages, documents, users
 } from "@shared/schema";
 
 export class ProjectsRepository {
@@ -83,7 +84,13 @@ export class ProjectsRepository {
   }
 
   async deleteProject(id: string): Promise<boolean> {
+    // Удаляем документы проекта (предотвращаем orphan records)
+    await db.delete(documents).where(eq(documents.project_id, id));
+
+    // Удаляем этапы проекта (которые удалят связанные зависимости и сообщения через CASCADE)
     await db.delete(project_stages).where(eq(project_stages.project_id, id));
+
+    // Удаляем сам проект (items и messages удалятся через CASCADE)
     const result = await db.delete(projects).where(eq(projects.id, id)).returning();
     return result.length > 0;
   }
@@ -135,6 +142,22 @@ export class ProjectsRepository {
     );
 
     return stagesWithProjects.filter(s => s.project);
+  }
+
+  async getProjectsByAssignee(assigneeId: string): Promise<Array<any>> {
+    // Получаем уникальные ID проектов с назначенными этапами
+    const stages = await db.select({ project_id: project_stages.project_id })
+      .from(project_stages)
+      .where(eq(project_stages.assignee_id, assigneeId));
+
+    const uniqueProjectIds = [...new Set(stages.map(s => s.project_id))];
+
+    // Получаем полные данные проектов
+    const projects = await Promise.all(
+      uniqueProjectIds.map(id => this.getProjectById(id))
+    );
+
+    return projects.filter(p => p !== undefined);
   }
 
   async createProjectStage(data: InsertProjectStage): Promise<ProjectStage> {
@@ -212,11 +235,34 @@ export class ProjectsRepository {
   }
 
   async startStage(id: string): Promise<ProjectStage | undefined> {
+    // Проверка зависимостей перед запуском
+    const dependencies = await db.select()
+      .from(stage_dependencies)
+      .where(eq(stage_dependencies.stage_id, id));
+
+    // Проверяем, что все зависимые этапы завершены
+    for (const dep of dependencies) {
+      const [dependentStage] = await db.select()
+        .from(project_stages)
+        .where(eq(project_stages.id, dep.depends_on_stage_id));
+
+      if (!dependentStage) {
+        throw new Error(`Зависимый этап не найден`);
+      }
+
+      if (dependentStage.status !== 'completed') {
+        throw new Error(
+          `Невозможно запустить этап. Сначала завершите этап "${dependentStage.name}"`
+        );
+      }
+    }
+
+    // Если все проверки пройдены - запускаем этап
     const result = await db.update(project_stages)
-      .set({ 
+      .set({
         actual_start_date: new Date(),
         status: 'in_progress',
-        updated_at: new Date() 
+        updated_at: new Date()
       })
       .where(eq(project_stages.id, id))
       .returning();
@@ -325,6 +371,7 @@ export class ProjectsRepository {
         price: position.price,
         source_document_id: invoiceId,
         order: index,
+        image_url: position.imageUrl || undefined,
       }));
 
       if (itemsData.length > 0) {
@@ -368,6 +415,7 @@ export class ProjectsRepository {
         price: position.price,
         source_document_id: invoiceId,
         order: index,
+        image_url: position.imageUrl || undefined,
       }));
 
       if (itemsData.length > 0) {
@@ -407,6 +455,8 @@ export class ProjectsRepository {
       assignee_id?: string;
       cost?: number;
       description?: string;
+      stage_type_id?: string;
+      template_data?: any;
     }[],
     dependencies: { stage_id: string; depends_on_stage_id: string }[]
   ): Promise<void> {
@@ -425,6 +475,8 @@ export class ProjectsRepository {
         assignee_id: stage.assignee_id,
         cost: stage.cost,
         description: stage.description,
+        stage_type_id: stage.stage_type_id,
+        type_data: stage.template_data ? JSON.stringify(stage.template_data) : undefined,
       });
 
       stageIdMap.set(stage.id, newStage.id);
@@ -710,6 +762,27 @@ export class ProjectsRepository {
     }
     
     return allDocs;
+  }
+
+  // Project Messages methods
+  async getProjectMessages(projectId: string) {
+    return await db.select({
+      id: project_messages.id,
+      project_id: project_messages.project_id,
+      user_id: project_messages.user_id,
+      message: project_messages.message,
+      created_at: project_messages.created_at,
+      user_name: users.username,
+    })
+      .from(project_messages)
+      .leftJoin(users, eq(project_messages.user_id, users.id))
+      .where(eq(project_messages.project_id, projectId))
+      .orderBy(asc(project_messages.created_at));
+  }
+
+  async createProjectMessage(data: InsertProjectMessage): Promise<ProjectMessage> {
+    const result = await db.insert(project_messages).values(data).returning();
+    return result[0];
   }
 
   // Reorder item stages atomically

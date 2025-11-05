@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, LayoutGrid, List, Settings, Trash2, CheckSquare } from "lucide-react";
+import { Plus, LayoutGrid, List, Settings, Trash2, CheckSquare, ChevronDown, ArrowRight, X } from "lucide-react";
 import { KanbanBoard } from "@/components/KanbanBoard";
 import { DealCard } from "@/components/DealCard";
 import { DealDetailSheet } from "@/components/DealDetailSheet";
@@ -10,8 +10,17 @@ import { DealCreateDialog } from "@/components/DealCreateDialog";
 import { ManageStagesDialog } from "@/components/ManageStagesDialog";
 import { DealCardModal } from "@/components/DealCardModal";
 import { DeleteDealDialog } from "@/components/DeleteDealDialog";
+import { BulkStageChangeDialog } from "@/components/BulkStageChangeDialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import type { Deal, User, DealStage } from "@shared/schema";
 import { DragStartEvent, DragOverEvent, DragEndEvent } from "@dnd-kit/core";
@@ -29,6 +38,7 @@ export default function Sales() {
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedDeals, setSelectedDeals] = useState<Set<string>>(new Set());
   const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
+  const [bulkStageDialogOpen, setBulkStageDialogOpen] = useState(false);
   const { toast } = useToast();
 
   const { data: deals = [], isLoading: dealsLoading, error: dealsError } = useQuery<Deal[]>({
@@ -126,6 +136,45 @@ export default function Sales() {
     },
   });
 
+  const bulkUpdateStageMutation = useMutation({
+    mutationFn: async ({ dealIds, newStage }: { dealIds: string[], newStage: string }) => {
+      return await apiRequest("POST", "/api/deals/bulk-update-stage", { dealIds, newStage });
+    },
+    onMutate: async ({ dealIds, newStage }) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/deals"] });
+      const previousDeals = queryClient.getQueryData(["/api/deals"]);
+
+      queryClient.setQueryData(["/api/deals"], (oldDeals: Deal[] | undefined) => {
+        if (!oldDeals) return oldDeals;
+        return oldDeals.map(deal =>
+          dealIds.includes(deal.id) ? { ...deal, stage: newStage } : deal
+        );
+      });
+
+      return { previousDeals };
+    },
+    onError: (error: any, variables, context) => {
+      if (context?.previousDeals) {
+        queryClient.setQueryData(["/api/deals"], context.previousDeals);
+      }
+      toast({
+        title: "Ошибка",
+        description: error.message || "Не удалось изменить этап",
+        variant: "destructive",
+      });
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/deals"] });
+      toast({
+        title: "Этап изменен",
+        description: data.message || `Этап изменен для ${selectedDeals.size} сделок`,
+      });
+      setSelectedDeals(new Set());
+      setSelectionMode(false);
+      setBulkStageDialogOpen(false);
+    },
+  });
+
   const handleToggleSelection = (dealId: string) => {
     setSelectedDeals(prev => {
       const newSet = new Set(prev);
@@ -149,6 +198,32 @@ export default function Sales() {
   const handleBulkDelete = () => {
     if (selectedDeals.size === 0) return;
     setBulkDeleteDialogOpen(true);
+  };
+
+  const handleToggleColumnSelection = (columnId: string) => {
+    // Получить все ID сделок в этой колонке
+    const columnDealIds = transformedDeals
+      .filter(deal => deal.stage === columnId)
+      .map(deal => deal.id);
+
+    if (columnDealIds.length === 0) return;
+
+    // Проверить сколько уже выбрано в этой колонке
+    const selectedInColumn = columnDealIds.filter(id => selectedDeals.has(id));
+
+    setSelectedDeals(prev => {
+      const newSet = new Set(prev);
+
+      // Если все выбраны → снять все
+      if (selectedInColumn.length === columnDealIds.length) {
+        columnDealIds.forEach(id => newSet.delete(id));
+      } else {
+        // Иначе → выбрать все
+        columnDealIds.forEach(id => newSet.add(id));
+      }
+
+      return newSet;
+    });
   };
 
   const handleDealClick = (dealId: string) => {
@@ -218,7 +293,31 @@ export default function Sales() {
       .filter((d) => d.stage === stage.key)
       .map((deal) => ({
         id: deal.id,
-        content: <DealCard key={deal.id} {...deal} onClick={() => handleDealClick(deal.id)} />
+        content: (
+          <div key={deal.id} className="relative">
+            {selectionMode && (
+              <div className="absolute top-2 left-2 z-10">
+                <Checkbox
+                  checked={selectedDeals.has(deal.id)}
+                  onCheckedChange={() => handleToggleSelection(deal.id)}
+                  onClick={(e) => e.stopPropagation()}
+                  data-testid={`checkbox-kanban-deal-${deal.id}`}
+                  className="bg-background"
+                />
+              </div>
+            )}
+            <DealCard
+              {...deal}
+              onClick={() => {
+                if (selectionMode) {
+                  handleToggleSelection(deal.id);
+                } else {
+                  handleDealClick(deal.id);
+                }
+              }}
+            />
+          </div>
+        )
       })),
   }));
 
@@ -260,10 +359,10 @@ export default function Sales() {
                 <Settings className="h-4 w-4 mr-2" />
                 Управление этапами
               </Button>
-              {currentUser?.can_delete_deals && view === "list" && (
-                <Button 
-                  variant="outline" 
-                  onClick={() => setSelectionMode(true)} 
+              {currentUser?.can_edit_deals && (
+                <Button
+                  variant="outline"
+                  onClick={() => setSelectionMode(true)}
                   data-testid="button-enable-selection"
                 >
                   <CheckSquare className="h-4 w-4 mr-2" />
@@ -294,31 +393,61 @@ export default function Sales() {
           )}
           {selectionMode && (
             <>
-              <Button 
-                variant="outline" 
+              <Badge variant="secondary" data-testid="badge-selected-count">
+                Выбрано: {selectedDeals.size}
+              </Badge>
+              <Button
+                variant="outline"
                 onClick={handleSelectAll}
                 data-testid="button-select-all"
               >
                 {selectedDeals.size === transformedDeals.length ? "Снять все" : "Выбрать все"}
               </Button>
-              <Button 
-                variant="outline" 
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="default"
+                    disabled={selectedDeals.size === 0}
+                    data-testid="button-actions-dropdown"
+                  >
+                    Действия ({selectedDeals.size}) <ChevronDown className="ml-2 h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {currentUser?.can_edit_deals && (
+                    <DropdownMenuItem
+                      onClick={() => setBulkStageDialogOpen(true)}
+                      data-testid="menu-item-change-stage"
+                    >
+                      <ArrowRight className="mr-2 h-4 w-4" />
+                      Изменить этап
+                    </DropdownMenuItem>
+                  )}
+                  {currentUser?.can_delete_deals && (
+                    <>
+                      {currentUser?.can_edit_deals && <DropdownMenuSeparator />}
+                      <DropdownMenuItem
+                        onClick={handleBulkDelete}
+                        className="text-destructive"
+                        data-testid="menu-item-delete"
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Удалить
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Button
+                variant="ghost"
                 onClick={() => {
                   setSelectionMode(false);
                   setSelectedDeals(new Set());
                 }}
                 data-testid="button-cancel-selection"
               >
+                <X className="h-4 w-4 mr-2" />
                 Отмена
-              </Button>
-              <Button 
-                variant="destructive"
-                onClick={handleBulkDelete}
-                disabled={selectedDeals.size === 0}
-                data-testid="button-bulk-delete"
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Удалить ({selectedDeals.size})
               </Button>
             </>
           )}
@@ -332,13 +461,16 @@ export default function Sales() {
           ))}
         </div>
       ) : view === "kanban" ? (
-        <KanbanBoard 
+        <KanbanBoard
           columns={kanbanColumns}
-          activeId={activeId}
-          onDragStart={handleDragStart}
-          onDragOver={handleDragOver}
-          onDragEnd={handleDragEnd}
-          activeItem={activeDeal ? <DealCard {...activeDeal} /> : undefined}
+          activeId={selectionMode ? null : activeId}
+          onDragStart={selectionMode ? () => {} : handleDragStart}
+          onDragOver={selectionMode ? () => {} : handleDragOver}
+          onDragEnd={selectionMode ? () => {} : handleDragEnd}
+          activeItem={!selectionMode && activeDeal ? <DealCard {...activeDeal} /> : undefined}
+          selectionMode={selectionMode}
+          selectedItems={selectedDeals}
+          onToggleColumnSelection={handleToggleColumnSelection}
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -391,6 +523,20 @@ export default function Sales() {
         onConfirm={() => bulkDeleteMutation.mutate(Array.from(selectedDeals))}
         dealName={`${selectedDeals.size} ${selectedDeals.size === 1 ? 'сделку' : selectedDeals.size < 5 ? 'сделки' : 'сделок'}`}
         isPending={bulkDeleteMutation.isPending}
+      />
+
+      <BulkStageChangeDialog
+        open={bulkStageDialogOpen}
+        onOpenChange={setBulkStageDialogOpen}
+        onConfirm={(newStage) => {
+          bulkUpdateStageMutation.mutate({
+            dealIds: Array.from(selectedDeals),
+            newStage
+          });
+        }}
+        selectedCount={selectedDeals.size}
+        stages={stages}
+        isPending={bulkUpdateStageMutation.isPending}
       />
     </div>
   );

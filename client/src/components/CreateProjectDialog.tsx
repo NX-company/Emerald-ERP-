@@ -83,14 +83,18 @@ export function CreateProjectDialog({
   });
 
   useEffect(() => {
-    if (open && invoicePositions.length > 0) {
-      setPositions([...invoicePositions]);
-      setSelectedIndices(new Set(invoicePositions.map((_, i) => i)));
+    if (open) {
+      console.log("[CreateProjectDialog] Dialog opened - initializing");
+      if (invoicePositions.length > 0) {
+        setPositions([...invoicePositions]);
+        setSelectedIndices(new Set(invoicePositions.map((_, i) => i)));
+      }
       setCurrentTab("positions");
       setSelectedPositionForStages(null);
-      setPositionStagesData({}); // Очистить данные этапов при открытии диалога
+      setPositionStagesData({}); // Очистить данные этапов только при открытии
+      console.log("[CreateProjectDialog] positionStagesData cleared");
     }
-  }, [open, invoicePositions]);
+  }, [open]); // Убрали invoicePositions из зависимостей - теперь срабатывает только при open/close
 
   const handleToggle = (index: number) => {
     const newSelected = new Set(selectedIndices);
@@ -197,6 +201,10 @@ export function CreateProjectDialog({
   };
 
   const goToStages = (index: number) => {
+    console.log("[GoToStages] Position index:", index);
+    console.log("[GoToStages] Current positionStagesData:", positionStagesData);
+    console.log("[GoToStages] Stages for position:", positionStagesData[index]?.stages);
+    console.log("[GoToStages] Stages count:", positionStagesData[index]?.stages?.length || 0);
     setSelectedPositionForStages(index);
     setCurrentTab("stages");
   };
@@ -217,21 +225,67 @@ export function CreateProjectDialog({
       );
       const data = response;
 
-      if (!data || !data.stages || !Array.isArray(data.stages)) {
-        throw new Error("Invalid template data structure");
+      // Детальное логирование для отладки
+      console.log("[ApplyTemplate] Full API Response:", response);
+      console.log("[ApplyTemplate] Response type:", typeof response);
+      console.log("[ApplyTemplate] Response keys:", Object.keys(response || {}));
+
+      if (data?.stages) {
+        console.log("[ApplyTemplate] Stages count:", data.stages.length);
+      }
+      if (data?.dependencies) {
+        console.log("[ApplyTemplate] Dependencies count:", data.dependencies.length);
+      }
+
+      // Проверка наличия данных
+      if (!data) {
+        console.error("[ApplyTemplate] Empty response from API");
+        throw new Error("Сервер вернул пустой ответ. Проверьте подключение.");
+      }
+
+      // Проверка поля template
+      if (!data.template) {
+        console.error("[ApplyTemplate] Missing 'template' field:", data);
+        throw new Error("Ответ сервера не содержит информацию о шаблоне.");
+      }
+
+      // Проверка поля stages
+      if (!data.stages) {
+        console.error("[ApplyTemplate] Missing 'stages' field:", data);
+        throw new Error("Ответ сервера не содержит этапы шаблона.");
+      }
+
+      if (!Array.isArray(data.stages)) {
+        console.error("[ApplyTemplate] 'stages' is not an array:", typeof data.stages, data.stages);
+        throw new Error(`Неверный формат этапов: ожидался массив, получен ${typeof data.stages}`);
+      }
+
+      // Проверка template.name для toast
+      if (!data.template.name) {
+        console.warn("[ApplyTemplate] Template has no name:", data.template);
       }
 
       const { template, stages, dependencies = [] } = data;
 
-      // Применить шаблон ко всем выбранным позициям
+      console.log("[ApplyTemplate] Validated data:", {
+        templateName: template.name,
+        stagesCount: stages.length,
+        dependenciesCount: dependencies.length
+      });
+
+      // Применить шаблон ко ВСЕМ позициям (независимо от выбора чекбоксами)
       const newStagesData: Record<number, PositionStagesData> = {};
 
-      selectedIndices.forEach(positionIndex => {
+      console.log("[ApplyTemplate] Applying to ALL positions, count:", positions.length);
+
+      positions.forEach((_, positionIndex) => {
         // Create stage ID mapping with crypto.randomUUID() for uniqueness
         const stageIdMap: Record<string, string> = {};
         stages.forEach((stage: any) => {
           stageIdMap[stage.id] = crypto.randomUUID();
         });
+
+        console.log(`[ApplyTemplate] Processing position ${positionIndex}:`, positions[positionIndex]?.name);
 
         // Map template stages to LocalStage format
         const localStages: LocalStage[] = stages.map((stage: any) => {
@@ -244,6 +298,8 @@ export function CreateProjectDialog({
           if (stage.assignee_id) stageObj.assignee_id = stage.assignee_id;
           if (stage.cost) stageObj.cost = parseFloat(stage.cost);
           if (stage.description) stageObj.description = stage.description;
+          if (stage.stage_type_id) stageObj.stage_type_id = stage.stage_type_id;
+          if (stage.template_data) stageObj.template_data = stage.template_data;
           return stageObj;
         });
 
@@ -252,7 +308,7 @@ export function CreateProjectDialog({
           .filter((dep: any) => {
             const hasValidIds = stageIdMap[dep.template_stage_id] && stageIdMap[dep.depends_on_template_stage_id];
             if (!hasValidIds) {
-              console.warn("Skipping dependency with missing stage IDs:", dep);
+              console.warn(`[ApplyTemplate] Skipping dependency for position ${positionIndex}:`, dep);
             }
             return hasValidIds;
           })
@@ -265,21 +321,48 @@ export function CreateProjectDialog({
           stages: localStages,
           dependencies: localDependencies,
         };
+
+        console.log(`[ApplyTemplate] Position ${positionIndex} stages count:`, localStages.length);
       });
 
-      setPositionStagesData(prev => ({
-        ...prev,
-        ...newStagesData,
-      }));
+      console.log("[ApplyTemplate] Total positions processed:", Object.keys(newStagesData).length);
+
+      setPositionStagesData(prev => {
+        const updated = {
+          ...prev,
+          ...newStagesData,
+        };
+        console.log("[ApplyTemplate] Updated positionStagesData:", updated);
+        console.log("[ApplyTemplate] Keys in positionStagesData:", Object.keys(updated));
+        return updated;
+      });
 
       toast({
-        description: `Шаблон "${template.name}" применён к ${selectedIndices.size} позициям`
+        description: `Шаблон "${template.name}" применён ко всем позициям (${positions.length})`
       });
       setSelectedTemplateId("");
-    } catch (error) {
-      console.error("Error applying template to all:", error);
-      const message = error instanceof Error ? error.message : "Ошибка при применении шаблона";
-      toast({ description: message, variant: "destructive" });
+    } catch (error: any) {
+      console.error("[ApplyTemplate] Error applying template:", error);
+      console.error("[ApplyTemplate] Error stack:", error.stack);
+
+      // Определить тип ошибки для более информативного сообщения
+      let errorMessage = "Не удалось применить шаблон";
+
+      if (error.message) {
+        errorMessage = error.message;
+      } else if (error.response?.status === 404) {
+        errorMessage = "Шаблон не найден на сервере";
+      } else if (error.response?.status === 500) {
+        errorMessage = "Внутренняя ошибка сервера";
+      } else if (error.name === "NetworkError") {
+        errorMessage = "Ошибка сети. Проверьте подключение.";
+      }
+
+      toast({
+        title: "Ошибка применения шаблона",
+        description: errorMessage,
+        variant: "destructive",
+      });
     } finally {
       setIsApplyingTemplate(false);
     }
@@ -320,6 +403,8 @@ export function CreateProjectDialog({
         if (stage.assignee_id) stageObj.assignee_id = stage.assignee_id;
         if (stage.cost) stageObj.cost = parseFloat(stage.cost);
         if (stage.description) stageObj.description = stage.description;
+        if (stage.stage_type_id) stageObj.stage_type_id = stage.stage_type_id;
+        if (stage.template_data) stageObj.template_data = stage.template_data;
         return stageObj;
       });
 

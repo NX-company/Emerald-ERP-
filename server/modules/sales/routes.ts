@@ -247,17 +247,78 @@ router.delete("/api/deals/:id", checkPermission("can_delete_deals"), async (req,
 router.post("/api/deals/bulk-delete", checkPermission("can_delete_deals"), async (req, res) => {
   try {
     const { dealIds } = req.body;
-    
+
     if (!Array.isArray(dealIds) || dealIds.length === 0) {
       res.status(400).json({ error: "dealIds must be a non-empty array" });
       return;
     }
-    
+
     const deletedCount = await salesRepository.bulkDeleteDeals(dealIds);
     res.json({ deletedCount, message: `Удалено ${deletedCount} сделок` });
   } catch (error) {
     console.error("Error bulk deleting deals:", error);
     res.status(500).json({ error: "Failed to bulk delete deals" });
+  }
+});
+
+// POST /api/deals/bulk-update-stage - Bulk update deal stage
+router.post("/api/deals/bulk-update-stage", checkPermission("can_edit_deals"), async (req, res) => {
+  try {
+    const { dealIds, newStage } = req.body;
+    const userId = req.headers["x-user-id"] as string;
+
+    if (!Array.isArray(dealIds) || dealIds.length === 0) {
+      res.status(400).json({ error: "dealIds must be a non-empty array" });
+      return;
+    }
+
+    if (!newStage || typeof newStage !== "string") {
+      res.status(400).json({ error: "newStage must be a non-empty string" });
+      return;
+    }
+
+    // Get old deal data for logging
+    const oldDeals = await Promise.all(
+      dealIds.map(id => salesRepository.getDealById(id))
+    );
+
+    // Update deals
+    const updatedCount = await salesRepository.bulkUpdateStage(dealIds, newStage);
+
+    // Get stage names for logging
+    const stages = await salesRepository.getAllDealStages();
+    const stageMap = stages.reduce((acc, stage) => {
+      acc[stage.key] = stage.name;
+      return acc;
+    }, {} as Record<string, string>);
+
+    const newStageName = stageMap[newStage] || newStage;
+
+    // Log activity for each deal
+    for (const oldDeal of oldDeals) {
+      if (oldDeal && oldDeal.stage !== newStage) {
+        const oldStageName = stageMap[oldDeal.stage] || oldDeal.stage;
+
+        await activityLogsRepository.logActivity({
+          entity_type: "deal",
+          entity_id: oldDeal.id,
+          action_type: "updated",
+          user_id: userId,
+          field_changed: "stage",
+          old_value: oldDeal.stage,
+          new_value: newStage,
+          description: `Этап изменен массово с "${oldStageName}" на "${newStageName}"`,
+        });
+      }
+    }
+
+    res.json({
+      updatedCount,
+      message: `Этап изменен для ${updatedCount} ${updatedCount === 1 ? 'сделки' : updatedCount < 5 ? 'сделок' : 'сделок'}`
+    });
+  } catch (error) {
+    console.error("Error bulk updating deal stage:", error);
+    res.status(500).json({ error: "Failed to bulk update deal stage" });
   }
 });
 

@@ -1,4 +1,4 @@
-import { Switch, Route, useLocation } from "wouter";
+import { Switch, Route, useLocation, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -21,7 +21,9 @@ import Documents from "@/pages/Documents";
 import AIAgents from "@/pages/AIAgents";
 import Settings from "@/pages/Settings";
 import ProcessTemplates from "@/pages/ProcessTemplates";
+import Login from "@/pages/Login";
 import NotFound from "@/pages/not-found";
+import { useEffect, useState } from "react";
 
 function Router() {
   return (
@@ -48,10 +50,21 @@ function Router() {
 
 function AppContent() {
   const [location] = useLocation();
+  const [userRole, setUserRole] = useState<any>(null);
+
+  useEffect(() => {
+    const role = localStorage.getItem("userRole");
+    if (role) {
+      setUserRole(JSON.parse(role));
+    }
+  }, []);
+
+  // Скрываем sidebar для роли замерщика
+  const showSidebar = userRole?.name !== 'Замерщик';
 
   return (
     <div className="flex h-screen w-full">
-      <AppSidebar activeModule={location} />
+      {showSidebar && <AppSidebar activeModule={location} />}
       <div className="flex flex-col flex-1">
         <TopBar />
         <main className="flex-1 overflow-auto p-4 md:p-6 bg-background">
@@ -63,11 +76,62 @@ function AppContent() {
 }
 
 function App() {
+  const [location, setLocation] = useLocation();
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    // Проверяем авторизацию при загрузке
+    const user = localStorage.getItem("user");
+
+    if (user) {
+      setIsAuthenticated(true);
+    } else {
+      setIsAuthenticated(false);
+      // Если не на странице логина, перенаправляем на неё
+      if (location !== "/login") {
+        setLocation("/login");
+      }
+    }
+
+    setIsLoading(false);
+  }, [location, setLocation]);
+
   const style = {
     "--sidebar-width": "20rem",
     "--sidebar-width-icon": "4rem",
   };
 
+  // Показываем загрузку пока проверяем аутентификацию
+  if (isLoading) {
+    return null;
+  }
+
+  // Если не авторизован и на странице логина, показываем только логин
+  if (!isAuthenticated && location === "/login") {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <Login />
+          <Toaster />
+        </TooltipProvider>
+      </QueryClientProvider>
+    );
+  }
+
+  // Если не авторизован и не на странице логина, перенаправляем
+  if (!isAuthenticated) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <Redirect to="/login" />
+          <Toaster />
+        </TooltipProvider>
+      </QueryClientProvider>
+    );
+  }
+
+  // Если авторизован, показываем основное приложение
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
