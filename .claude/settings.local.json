@@ -38,7 +38,12 @@
       "Bash(node test_project_creation_simple.mjs:*)",
       "Bash(node test_stage_update_simple.mjs:*)",
       "Bash(git add:*)",
-      "Bash(node check_timestamp.mjs:*)"
+      "Bash(node check_timestamp.mjs:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(ssh -o StrictHostKeyChecking=no root@147.45.146.149 \"cd /root && wget -q https://raw.githubusercontent.com/NX-company/Emerald-ERP-/main/deploy-initial.sh && chmod +x deploy-initial.sh && echo ''''Starting deployment...'''' && nohup ./deploy-initial.sh > deployment.log 2>&1 &\")",
+      "Bash(ssh -o StrictHostKeyChecking=no root@147.45.146.149 \"tail -n 50 /root/deployment.log 2>/dev/null || echo ''Waiting for deployment to start...''\")",
+      "Bash(ssh:*)"
     ],
     "deny": [],
     "ask": []
