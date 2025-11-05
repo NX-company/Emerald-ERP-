@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, setCurrentUserId } from "@/lib/queryClient";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 
 export default function Login() {
@@ -29,6 +29,7 @@ export default function Login() {
       localStorage.setItem("user", JSON.stringify(data.user));
       localStorage.setItem("userRole", JSON.stringify(data.role));
       localStorage.setItem("userPermissions", JSON.stringify(data.permissions));
+      setCurrentUserId(data.user.id);
 
       toast({ description: "Вход выполнен успешно" });
 

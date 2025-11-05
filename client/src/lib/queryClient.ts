@@ -2,20 +2,7 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
 export function getCurrentUserId(): string {
   const storedUserId = localStorage.getItem("currentUserId");
-  const defaultUserId = "QHu1kUFKhu8baYbodQZ5Q";
-
-  // Migrate old PostgreSQL UUID to new SQLite ID
-  if (storedUserId === "c2fdd40b-dadf-4fbb-848a-74283d14802e") {
-    localStorage.setItem("currentUserId", defaultUserId);
-    return defaultUserId;
-  }
-
-  if (storedUserId) {
-    return storedUserId;
-  }
-
-  localStorage.setItem("currentUserId", defaultUserId);
-  return defaultUserId;
+  return storedUserId || "";
 }
 
 export function setCurrentUserId(userId: string) {
