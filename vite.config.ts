@@ -4,6 +4,9 @@ import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 
 export default defineConfig({
+  optimizeDeps: {
+    include: ['qrcode', 'html5-qrcode']
+  },
   plugins: [
     react(),
     runtimeErrorOverlay(),
@@ -34,7 +37,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'http://localhost:9000',
+        target: 'http://localhost:5000',
         changeOrigin: true,
       },
     },

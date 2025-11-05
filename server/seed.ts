@@ -7,6 +7,75 @@ import { eq } from 'drizzle-orm';
 async function seed() {
   console.log('🌱 Starting database seeding...');
 
+  // Create "Администратор" role or get existing
+  let adminRole = await db.select().from(roles).where(eq(roles.name, 'Администратор')).limit(1);
+  let adminRoleId: string;
+
+  if (adminRole.length === 0) {
+    adminRoleId = nanoid();
+    await db.insert(roles).values({
+      id: adminRoleId,
+      name: 'Администратор',
+      description: 'Полный доступ ко всей системе',
+      is_system: true,
+    });
+    console.log('✅ Role "Администратор" created');
+  } else {
+    adminRoleId = adminRole[0].id;
+    console.log('✅ Role "Администратор" already exists');
+  }
+
+  // Create permissions for "Администратор" role - full access to all modules
+  const existingAdminPermissions = await db.select()
+    .from(role_permissions)
+    .where(eq(role_permissions.role_id, adminRoleId))
+    .limit(1);
+
+  if (existingAdminPermissions.length === 0) {
+    const modules = ['sales', 'projects', 'warehouse', 'finance', 'installation', 'tasks', 'documents', 'users', 'roles', 'settings'];
+
+    for (const module of modules) {
+      await db.insert(role_permissions).values({
+        id: nanoid(),
+        role_id: adminRoleId,
+        module: module,
+        can_view: true,
+        can_create: true,
+        can_edit: true,
+        can_delete: true,
+        view_all: true,
+      });
+    }
+    console.log('✅ Permissions for "Администратор" role created');
+  } else {
+    console.log('✅ Permissions for "Администратор" role already exist');
+  }
+
+  // Create "Береговой Максим" admin user
+  const existingAdmin = await db.select()
+    .from(users)
+    .where(eq(users.username, 'beregovoy'))
+    .limit(1);
+
+  if (existingAdmin.length === 0) {
+    const adminPassword = process.env.ADMIN_PASSWORD || 'Admin2025!Secure';
+    const hashedPasswordAdmin = await bcrypt.hash(adminPassword, 10);
+    await db.insert(users).values({
+      id: nanoid(),
+      username: 'beregovoy',
+      password: hashedPasswordAdmin,
+      email: 'beregovoy@emeralderp.com',
+      full_name: 'Береговой Максим',
+      role_id: adminRoleId,
+      phone: '+79999999999',
+      is_active: true,
+    });
+    console.log(`✅ Admin user created: username=beregovoy, password=${adminPassword}`);
+    console.log('   Full name: Береговой Максим');
+  } else {
+    console.log('✅ Admin user already exists: username=beregovoy (Береговой Максим)');
+  }
+
   // Create "Замерщик" role or get existing
   let measurerRole = await db.select().from(roles).where(eq(roles.name, 'Замерщик')).limit(1);
   let measurerRoleId: string;
