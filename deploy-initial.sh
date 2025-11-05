@@ -61,7 +61,7 @@ NODE_ENV=production
 PORT=3000
 DATABASE_URL=postgresql://emerald_user:EmeraldSecure2025!@localhost:5432/emerald_erp
 SESSION_SECRET=$(openssl rand -base64 64 | tr -d '\n')
-ADMIN_PASSWORD=BeregovoyAdmin2025!
+ADMIN_PASSWORD=Bereg2025
 UPLOAD_DIR=/var/www/emerald-erp/attached_assets
 LOG_LEVEL=info
 EOL
@@ -169,8 +169,8 @@ echo "📝 Important information:"
 echo "   Database: emerald_erp"
 echo "   Database User: emerald_user"
 echo "   Database Password: EmeraldSecure2025!"
-echo "   Admin Username: beregovoy"
-echo "   Admin Password: BeregovoyAdmin2025!"
+echo "   Admin Username: Admin"
+echo "   Admin Password: Bereg2025"
 echo "   Application URL: http://147.45.146.149"
 echo ""
 echo "🔐 Security recommendations:"

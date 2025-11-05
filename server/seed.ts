@@ -54,26 +54,26 @@ async function seed() {
   // Create "Береговой Максим" admin user
   const existingAdmin = await db.select()
     .from(users)
-    .where(eq(users.username, 'beregovoy'))
+    .where(eq(users.username, 'Admin'))
     .limit(1);
 
   if (existingAdmin.length === 0) {
-    const adminPassword = process.env.ADMIN_PASSWORD || 'Admin2025!Secure';
+    const adminPassword = process.env.ADMIN_PASSWORD || 'Bereg2025';
     const hashedPasswordAdmin = await bcrypt.hash(adminPassword, 10);
     await db.insert(users).values({
       id: nanoid(),
-      username: 'beregovoy',
+      username: 'Admin',
       password: hashedPasswordAdmin,
-      email: 'beregovoy@emeralderp.com',
+      email: 'admin@emeralderp.com',
       full_name: 'Береговой Максим',
       role_id: adminRoleId,
       phone: '+79999999999',
       is_active: true,
     });
-    console.log(`✅ Admin user created: username=beregovoy, password=${adminPassword}`);
+    console.log(`✅ Admin user created: username=Admin, password=${adminPassword}`);
     console.log('   Full name: Береговой Максим');
   } else {
-    console.log('✅ Admin user already exists: username=beregovoy (Береговой Максим)');
+    console.log('✅ Admin user already exists: username=Admin (Береговой Максим)');
   }
 
   // Create "Замерщик" role or get existing
