@@ -2,7 +2,7 @@ module.exports = {
   apps: [{
     name: 'emerald-erp',
     script: './dist/index.js',
-    instances: 'max', // Использовать все доступные ядра CPU
+    instances: 2, // Фиксированное количество инстансов (стабильнее чем 'max')
     exec_mode: 'cluster',
     env: {
       NODE_ENV: 'production',
@@ -15,10 +15,12 @@ module.exports = {
     max_memory_restart: '1G',
     autorestart: true,
     watch: false,
-    max_restarts: 10,
+    max_restarts: 3, // Уменьшено до 3 (если падает 3 раза - проблема серьезная)
     min_uptime: '10s',
-    cron_restart: '0 2 * * *', // Перезапуск каждый день в 2 ночи
     merge_logs: true,
-    log_date_format: 'YYYY-MM-DD HH:mm:ss Z'
+    log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+    // Health check таймауты
+    listen_timeout: 10000, // Ждать 10 секунд пока приложение запустится
+    kill_timeout: 5000 // Ждать 5 секунд для graceful shutdown
   }]
 };

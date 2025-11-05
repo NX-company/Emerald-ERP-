@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import { db } from "./db";
 // Trigger reload
 
 // Import modular routes
@@ -27,6 +28,27 @@ import stageMediaCommentsRouter from "./modules/stage-media-comments/routes";
 import { router as authRouter } from "./modules/auth/routes";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Health check endpoint
+  app.get('/api/health', async (req, res) => {
+    try {
+      // Check database connection
+      await db.execute('SELECT 1');
+
+      res.status(200).json({
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        environment: process.env.NODE_ENV || 'development'
+      });
+    } catch (error) {
+      res.status(503).json({
+        status: 'unhealthy',
+        error: 'Database connection failed',
+        timestamp: new Date().toISOString()
+      });
+    }
+  });
+
   // Register all modular routes (они уже содержат префикс /api)
   app.use(authRouter);
   app.use(salesRouter);
