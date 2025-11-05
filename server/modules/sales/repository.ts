@@ -97,6 +97,17 @@ export class SalesRepository {
     return result.length;
   }
 
+  async bulkUpdateStage(ids: string[], newStage: string): Promise<number> {
+    if (ids.length === 0) {
+      return 0;
+    }
+    const result = await db.update(deals)
+      .set({ stage: newStage, updated_at: new Date() })
+      .where(inArray(deals.id, ids))
+      .returning();
+    return result.length;
+  }
+
   async getDealsByStage(stage: string): Promise<Deal[]> {
     return await db.select().from(deals).where(eq(deals.stage, stage));
   }

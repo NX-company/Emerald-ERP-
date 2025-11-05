@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -68,6 +68,16 @@ export default function Warehouse() {
   const { data: projects = [] } = useQuery<Project[]>({
     queryKey: ["/api/projects"],
   });
+
+  useEffect(() => {
+    if (error) {
+      toast({
+        title: "Ошибка загрузки",
+        description: "Не удалось загрузить данные склада",
+        variant: "destructive",
+      });
+    }
+  }, [error, toast]);
 
   const currentUserId = users[0]?.id || "";
 

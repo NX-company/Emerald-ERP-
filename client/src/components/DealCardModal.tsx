@@ -66,6 +66,14 @@ export function DealCardModal({ dealId, open, onOpenChange }: DealCardModalProps
   const { data: existingProject } = useQuery<Project>({
     queryKey: [`/api/projects/by-deal/${dealId}`],
     enabled: !!dealId && open,
+    retry: false,
+    refetchOnWindowFocus: false,
+    onError: (error: any) => {
+      // Suppress 404 errors - it's normal when no project exists yet
+      if (error.response?.status !== 404) {
+        console.error('[DealCardModal] Error fetching project:', error);
+      }
+    },
   });
 
   const { data: activityLogs = [], isLoading: activityLogsLoading } = useQuery<any[]>({

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,12 +18,14 @@ import { z } from "zod";
 import { format } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { StageTypeSelector } from "./StageTypeSelector";
 
 const formSchema = insertProjectStageSchema
   .omit({ project_id: true, item_id: true, order: true })
   .extend({
     name: z.string().min(1, "Название обязательно"),
     description: z.string().optional(),
+    stage_type_id: z.string().nullable().optional(),
     duration_days: z.union([z.string(), z.number(), z.null()]).optional().transform((val) => {
       if (val === null || val === undefined || val === "") return undefined;
       return typeof val === "string" ? parseInt(val) : val;
@@ -62,6 +64,7 @@ export function StageDialog({ open, onOpenChange, projectId, itemId, stage }: St
     defaultValues: {
       name: "",
       description: "",
+      stage_type_id: null,
       duration_days: undefined,
       planned_start_date: null,
       planned_end_date: null,
@@ -76,6 +79,7 @@ export function StageDialog({ open, onOpenChange, projectId, itemId, stage }: St
       form.reset({
         name: stage.name,
         description: stage.description || "",
+        stage_type_id: stage.stage_type_id || null,
         duration_days: stage.duration_days || undefined,
         planned_start_date: stage.planned_start_date ? new Date(stage.planned_start_date) : null,
         planned_end_date: stage.planned_end_date ? new Date(stage.planned_end_date) : null,
@@ -87,6 +91,7 @@ export function StageDialog({ open, onOpenChange, projectId, itemId, stage }: St
       form.reset({
         name: "",
         description: "",
+        stage_type_id: null,
         duration_days: undefined,
         planned_start_date: null,
         planned_end_date: null,
@@ -206,6 +211,22 @@ export function StageDialog({ open, onOpenChange, projectId, itemId, stage }: St
               rows={3}
             />
           </div>
+
+          {!isEditing && (
+            <div className="space-y-2">
+              <Label>Тип этапа</Label>
+              <Controller
+                name="stage_type_id"
+                control={form.control}
+                render={({ field }) => (
+                  <StageTypeSelector
+                    selectedTypeId={field.value}
+                    onSelectType={field.onChange}
+                  />
+                )}
+              />
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="duration_days">Длительность (дней)</Label>

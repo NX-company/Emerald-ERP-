@@ -14,10 +14,12 @@ vite.config.ts.*
 .local/
 *.log
 server_log.txt
+database.db
 
 # Test scripts
 test_*.mjs
 verify_stage_update.mjs
+check_messages_table.mjs
 
 # Temporary files
 nul

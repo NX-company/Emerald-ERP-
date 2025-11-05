@@ -9,6 +9,17 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { StageTypeSelector } from "./StageTypeSelector";
+import { TemplateStageTypeForm } from "./TemplateStageTypeForm";
+import { useQuery } from "@tanstack/react-query";
+import type { StageType } from "@shared/schema";
+import {
   DndContext,
   closestCenter,
   KeyboardSensor,
@@ -37,6 +48,8 @@ import {
 export interface LocalStage {
   id: string;
   name: string;
+  stage_type_id?: string; // тип этапа из библиотеки
+  template_data?: any; // данные специфичные для типа этапа (JSON)
   order_index: number;
   duration_days?: number;
   assignee_id?: string;
@@ -67,6 +80,7 @@ function SortableStageCard({
   stages,
   dependencies,
   users,
+  stageTypes,
   chainInfo,
   onDeleteStage,
   onUpdateStage,
@@ -207,6 +221,21 @@ function SortableStageCard({
               className="mt-1"
             />
           </div>
+
+          {/* Специализированная форма для типа этапа */}
+          {stage.stage_type_id && (() => {
+            const stageType = stageTypes?.find((st: StageType) => st.id === stage.stage_type_id);
+            if (!stageType) return null;
+
+            return (
+              <TemplateStageTypeForm
+                stageTypeCode={stageType.code}
+                stageTypeName={stageType.name}
+                data={stage.template_data}
+                onChange={(data) => onUpdateStage(stage.id, 'template_data', data)}
+              />
+            );
+          })()}
 
           {/* Срок и стоимость */}
           <div className="grid grid-cols-2 gap-3">
@@ -412,6 +441,8 @@ export function LocalStageEditor({
   users = []
 }: LocalStageEditorProps) {
   const [newStageName, setNewStageName] = useState("");
+  const [showTypeDialog, setShowTypeDialog] = useState(false);
+  const [selectedTypeId, setSelectedTypeId] = useState<string | null>(null);
 
   // Логирование при получении новых props
   useEffect(() => {
@@ -421,7 +452,12 @@ export function LocalStageEditor({
     console.log("[LocalStageEditor] Зависимости:", dependencies);
   }, [stages, dependencies, positionName]);
 
-  // Рассчитываем цеп и цвета для зависимостей
+  // Загружаем типы этапов
+  const { data: stageTypes = [] } = useQuery<StageType[]>({
+    queryKey: ['/api/stage-types'],
+  });
+
+  // Рассчитываем цепи и цвета для зависимостей
   const chainColors = useMemo(() => {
     return assignChainColors(
       stages.map(s => s.id),
@@ -440,16 +476,25 @@ export function LocalStageEditor({
 
   const handleAddStage = () => {
     if (!newStageName.trim()) return;
+    // Открываем диалог выбора типа
+    setShowTypeDialog(true);
+  };
+
+  const handleConfirmAddStage = () => {
+    if (!newStageName.trim()) return;
 
     const newStage: LocalStage = {
       id: `temp-${Date.now()}`,
       name: newStageName,
+      stage_type_id: selectedTypeId || undefined,
       order_index: stages.length,
       attachments: [],
     };
 
     onStagesChange([...stages, newStage]);
     setNewStageName("");
+    setSelectedTypeId(null);
+    setShowTypeDialog(false);
   };
 
   const handleDeleteStage = (id: string) => {
@@ -599,6 +644,7 @@ export function LocalStageEditor({
                       stages={stages}
                       dependencies={dependencies}
                       users={users}
+                      stageTypes={stageTypes}
                       chainInfo={chainColors.get(stage.id)}
                       onDeleteStage={handleDeleteStage}
                       onUpdateStage={handleUpdateStage}
@@ -637,6 +683,41 @@ export function LocalStageEditor({
           </Button>
         </div>
       </div>
+
+      {/* Диалог выбора типа этапа */}
+      <Dialog open={showTypeDialog} onOpenChange={setShowTypeDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Выбор типа этапа</DialogTitle>
+            <DialogDescription>
+              Выберите тип для этапа "{newStageName}"
+            </DialogDescription>
+          </DialogHeader>
+
+          <StageTypeSelector
+            selectedTypeId={selectedTypeId}
+            onSelectType={setSelectedTypeId}
+          />
+
+          <div className="flex justify-end gap-2 mt-4">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowTypeDialog(false);
+                setSelectedTypeId(null);
+              }}
+            >
+              Отмена
+            </Button>
+            <Button
+              onClick={handleConfirmAddStage}
+              disabled={!selectedTypeId}
+            >
+              Добавить этап
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

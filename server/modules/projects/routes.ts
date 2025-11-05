@@ -3,7 +3,8 @@ import { projectsRepository } from "./repository";
 import {
   insertProjectSchema, insertProjectStageSchema, insertProjectItemSchema,
   insertStageDependencySchema, insertProcessTemplateSchema, insertTemplateStageSchema,
-  insertTemplateDependencySchema, insertStageMessageSchema, project_stages
+  insertTemplateDependencySchema, insertStageMessageSchema, insertProjectMessageSchema, project_stages,
+  project_items, projects
 } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
 import { salesRepository } from "../sales/repository";
@@ -17,14 +18,28 @@ export const router = Router();
 // GET /api/projects - Get all projects or filter by status
 router.get("/api/projects", async (req, res) => {
   try {
-    const { status } = req.query;
-    
-    if (status && typeof status === "string") {
-      const projects = await projectsRepository.getProjectsByStatus(status);
-      res.json(projects);
+    const { status, userId, userRole } = req.query;
+
+    // Если пользователь - замерщик (или роль с view_all=false), показываем только проекты с назначенными этапами
+    if (userId && userRole === 'Замерщик') {
+      const projectsWithAssignedStages = await projectsRepository.getProjectsByAssignee(userId as string);
+
+      // Фильтруем по статусу если указан
+      if (status && typeof status === "string") {
+        const filtered = projectsWithAssignedStages.filter(p => p.status === status);
+        res.json(filtered);
+      } else {
+        res.json(projectsWithAssignedStages);
+      }
     } else {
-      const projects = await projectsRepository.getAllProjects();
-      res.json(projects);
+      // Для админов и менеджеров - показываем все проекты
+      if (status && typeof status === "string") {
+        const projects = await projectsRepository.getProjectsByStatus(status);
+        res.json(projects);
+      } else {
+        const projects = await projectsRepository.getAllProjects();
+        res.json(projects);
+      }
     }
   } catch (error) {
     console.error("Error fetching projects:", error);
@@ -104,6 +119,8 @@ router.post("/api/projects/from-invoice", async (req, res) => {
           assignee_id: z.string().optional(),
           cost: z.number().optional(),
           description: z.string().optional(),
+          stage_type_id: z.string().optional(),
+          template_data: z.any().optional(),
         })),
         dependencies: z.array(z.object({
           stage_id: z.string(),
@@ -225,22 +242,34 @@ router.post("/api/projects/from-invoice", async (req, res) => {
 router.put("/api/projects/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     const validationResult = insertProjectSchema.partial().safeParse(req.body);
-    
+
     if (!validationResult.success) {
       const errorMessage = fromZodError(validationResult.error).toString();
       res.status(400).json({ error: errorMessage });
       return;
     }
-    
+
     const updatedProject = await projectsRepository.updateProject(id, validationResult.data);
-    
+
     if (!updatedProject) {
       res.status(404).json({ error: "Project not found" });
       return;
     }
-    
+
+    // Log activity
+    await activityLogsRepository.logActivity({
+      entity_type: "project",
+      entity_id: id,
+      action_type: "updated",
+      user_id: req.body.user_id || null,
+      field_changed: null,
+      old_value: null,
+      new_value: null,
+      description: `Обновлён проект "${updatedProject.name}"`,
+    });
+
     res.json(updatedProject);
   } catch (error) {
     console.error("Error updating project:", error);
@@ -252,13 +281,35 @@ router.put("/api/projects/:id", async (req, res) => {
 router.delete("/api/projects/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const deleted = await projectsRepository.deleteProject(id);
-    
-    if (!deleted) {
+
+    // Получаем информацию о проекте перед удалением для логирования
+    const project = await projectsRepository.getProjectById(id);
+
+    if (!project) {
       res.status(404).json({ error: "Project not found" });
       return;
     }
-    
+
+    // Удаляем проект
+    const deleted = await projectsRepository.deleteProject(id);
+
+    if (!deleted) {
+      res.status(500).json({ error: "Failed to delete project" });
+      return;
+    }
+
+    // Логируем активность удаления
+    await activityLogsRepository.logActivity({
+      entity_type: "project",
+      entity_id: id,
+      action_type: "deleted",
+      user_id: req.body.user_id || (req.headers["x-user-id"] as string) || null,
+      field_changed: null,
+      old_value: project.name,
+      new_value: null,
+      description: `Удалён проект "${project.name}"`,
+    });
+
     res.status(204).send();
   } catch (error) {
     console.error("Error deleting project:", error);
@@ -275,6 +326,62 @@ router.get("/api/my-tasks/:userId", async (req, res) => {
   } catch (error) {
     console.error("Error fetching user tasks:", error);
     res.status(500).json({ error: "Failed to fetch user tasks" });
+  }
+});
+
+// GET /api/my-measurement-tasks/:userId - Get measurement tasks for measurer (simplified)
+router.get("/api/my-measurement-tasks/:userId", async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    // Get only stages assigned to this user with project info
+    const stagesWithProjects = await db
+      .select({
+        stage_id: project_stages.id,
+        stage_name: project_stages.name,
+        stage_status: project_stages.status,
+        stage_type_id: project_stages.stage_type_id,
+        deadline: project_stages.planned_end_date,
+        type_data: project_stages.type_data,
+        project_id: projects.id,
+        project_name: projects.name,
+        client_name: projects.client_name,
+      })
+      .from(project_stages)
+      .leftJoin(projects, eq(projects.id, project_stages.project_id))
+      .where(eq(project_stages.assignee_id, userId));
+
+    // Map to simplified task format
+    const tasks = stagesWithProjects.map((row) => {
+      // Parse type_data to extract address
+      let address = '';
+      if (row.type_data) {
+        try {
+          const typeData = typeof row.type_data === 'string'
+            ? JSON.parse(row.type_data)
+            : row.type_data;
+          address = typeData.address || '';
+        } catch (e) {
+          // Ignore parse errors
+        }
+      }
+
+      return {
+        id: row.stage_id,
+        project_id: row.project_id,
+        project_name: row.project_name,
+        client_name: row.client_name,
+        stage_name: row.stage_name,
+        status: row.stage_status,
+        deadline: row.deadline,
+        address: address,
+      };
+    });
+
+    res.json(tasks);
+  } catch (error) {
+    console.error("Error fetching measurer tasks:", error);
+    res.status(500).json({ error: "Failed to fetch measurer tasks" });
   }
 });
 
@@ -301,25 +408,38 @@ router.get("/api/projects/:id/stages", async (req, res) => {
 router.post("/api/projects/:id/stages", async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     const project = await projectsRepository.getProjectById(id);
     if (!project) {
       res.status(404).json({ error: "Project not found" });
       return;
     }
-    
+
     const validationResult = insertProjectStageSchema.safeParse({
       ...req.body,
       project_id: id
     });
-    
+
     if (!validationResult.success) {
       const errorMessage = fromZodError(validationResult.error).toString();
       res.status(400).json({ error: errorMessage });
       return;
     }
-    
+
     const newStage = await projectsRepository.createProjectStage(validationResult.data);
+
+    // Log activity
+    await activityLogsRepository.logActivity({
+      entity_type: "project",
+      entity_id: id,
+      action_type: "created",
+      user_id: req.body.user_id || null,
+      field_changed: "stage",
+      old_value: null,
+      new_value: newStage.name,
+      description: `Создан этап "${newStage.name}"`,
+    });
+
     res.status(201).json(newStage);
   } catch (error) {
     console.error("Error creating project stage:", error);
@@ -331,22 +451,88 @@ router.post("/api/projects/:id/stages", async (req, res) => {
 router.put("/api/projects/stages/:stageId", async (req, res) => {
   try {
     const { stageId } = req.params;
-    
+
     const validationResult = insertProjectStageSchema.partial().safeParse(req.body);
-    
+
     if (!validationResult.success) {
       const errorMessage = fromZodError(validationResult.error).toString();
       res.status(400).json({ error: errorMessage });
       return;
     }
-    
+
+    // Get old stage before updating (for logging)
+    const oldStageResult = await db
+      .select()
+      .from(project_stages)
+      .where(eq(project_stages.id, stageId))
+      .limit(1);
+    const oldStage = oldStageResult[0];
+
     const updatedStage = await projectsRepository.updateProjectStage(stageId, validationResult.data);
-    
+
     if (!updatedStage) {
       res.status(404).json({ error: "Project stage not found" });
       return;
     }
-    
+
+    // Log activity for deadline changes
+    if (validationResult.data.deadline) {
+      await activityLogsRepository.logActivity({
+        entity_type: "project",
+        entity_id: updatedStage.project_id,
+        action_type: "deadline_changed",
+        user_id: req.body.user_id || null,
+        field_changed: "deadline",
+        old_value: null,
+        new_value: validationResult.data.deadline.toString(),
+        description: `Изменён дедлайн этапа "${updatedStage.name}"`,
+      });
+    }
+
+    // Log measurement_date changes in type_data
+    if (validationResult.data.type_data && oldStage) {
+      try {
+        const oldTypeData = oldStage.type_data
+          ? (typeof oldStage.type_data === 'string' ? JSON.parse(oldStage.type_data) : oldStage.type_data)
+          : {};
+        const newTypeData = typeof validationResult.data.type_data === 'string'
+          ? JSON.parse(validationResult.data.type_data)
+          : validationResult.data.type_data;
+
+        const oldMeasurementDate = oldTypeData.measurement_date;
+        const newMeasurementDate = newTypeData.measurement_date;
+
+        if (oldMeasurementDate !== newMeasurementDate && newMeasurementDate) {
+          await activityLogsRepository.logActivity({
+            entity_type: "project",
+            entity_id: updatedStage.project_id,
+            action_type: "measurement_date_changed",
+            user_id: req.body.user_id || null,
+            field_changed: "measurement_date",
+            old_value: oldMeasurementDate || null,
+            new_value: newMeasurementDate,
+            description: `Изменена дата замера для этапа "${updatedStage.name}"`,
+          });
+        }
+      } catch (e) {
+        console.error("Error parsing type_data for logging:", e);
+      }
+    }
+
+    // Log general stage update if no specific field was logged
+    if (!validationResult.data.deadline && !validationResult.data.type_data) {
+      await activityLogsRepository.logActivity({
+        entity_type: "project",
+        entity_id: updatedStage.project_id,
+        action_type: "stage_updated",
+        user_id: req.body.user_id || null,
+        field_changed: null,
+        old_value: null,
+        new_value: null,
+        description: `Обновлён этап "${updatedStage.name}"`,
+      });
+    }
+
     res.json(updatedStage);
   } catch (error) {
     console.error("Error updating project stage:", error);
@@ -358,13 +544,32 @@ router.put("/api/projects/stages/:stageId", async (req, res) => {
 router.delete("/api/projects/stages/:stageId", async (req, res) => {
   try {
     const { stageId } = req.params;
+
+    // Get stage info before deleting
+    const stage = await db.select().from(project_stages).where(eq(project_stages.id, stageId)).limit(1);
+    const stageInfo = stage[0];
+
     const deleted = await projectsRepository.deleteProjectStage(stageId);
-    
+
     if (!deleted) {
       res.status(404).json({ error: "Project stage not found" });
       return;
     }
-    
+
+    // Log activity
+    if (stageInfo) {
+      await activityLogsRepository.logActivity({
+        entity_type: "project",
+        entity_id: stageInfo.project_id,
+        action_type: "deleted",
+        user_id: req.body.user_id || null,
+        field_changed: "stage",
+        old_value: stageInfo.name,
+        new_value: null,
+        description: `Удалён этап "${stageInfo.name}"`,
+      });
+    }
+
     res.status(204).send();
   } catch (error) {
     console.error("Error deleting project stage:", error);
@@ -377,12 +582,24 @@ router.post("/api/projects/:id/start", async (req, res) => {
   try {
     const { id } = req.params;
     const updatedProject = await projectsRepository.startProject(id);
-    
+
     if (!updatedProject) {
       res.status(404).json({ error: "Project not found" });
       return;
     }
-    
+
+    // Log activity
+    await activityLogsRepository.logActivity({
+      entity_type: "project",
+      entity_id: id,
+      action_type: "started",
+      user_id: req.body.user_id || null,
+      field_changed: "status",
+      old_value: "pending",
+      new_value: "in_progress",
+      description: `Проект "${updatedProject.name}" запущен`,
+    });
+
     res.json(updatedProject);
   } catch (error) {
     console.error("Error starting project:", error);
@@ -395,12 +612,24 @@ router.post("/api/projects/stages/:stageId/start", async (req, res) => {
   try {
     const { stageId } = req.params;
     const updatedStage = await projectsRepository.startStage(stageId);
-    
+
     if (!updatedStage) {
       res.status(404).json({ error: "Project stage not found" });
       return;
     }
-    
+
+    // Log activity
+    await activityLogsRepository.logActivity({
+      entity_type: "project",
+      entity_id: updatedStage.project_id,
+      action_type: "stage_started",
+      user_id: req.body.user_id || null,
+      field_changed: "stage_status",
+      old_value: "pending",
+      new_value: "in_progress",
+      description: `Запущен этап "${updatedStage.name}"`,
+    });
+
     res.json(updatedStage);
   } catch (error) {
     console.error("Error starting stage:", error);
@@ -413,12 +642,24 @@ router.post("/api/projects/stages/:stageId/complete", async (req, res) => {
   try {
     const { stageId } = req.params;
     const updatedStage = await projectsRepository.completeStage(stageId);
-    
+
     if (!updatedStage) {
       res.status(404).json({ error: "Project stage not found" });
       return;
     }
-    
+
+    // Log activity
+    await activityLogsRepository.logActivity({
+      entity_type: "project",
+      entity_id: updatedStage.project_id,
+      action_type: "stage_completed",
+      user_id: req.body.user_id || null,
+      field_changed: "stage_status",
+      old_value: "in_progress",
+      new_value: "completed",
+      description: `Завершён этап "${updatedStage.name}"`,
+    });
+
     res.json(updatedStage);
   } catch (error) {
     console.error("Error completing stage:", error);
@@ -480,19 +721,32 @@ router.get("/api/projects/:projectId/items", async (req, res) => {
 router.post("/api/projects/:projectId/items", async (req, res) => {
   try {
     const { projectId } = req.params;
-    
+
     const validationResult = insertProjectItemSchema.safeParse({
       ...req.body,
       project_id: projectId
     });
-    
+
     if (!validationResult.success) {
       const errorMessage = fromZodError(validationResult.error).toString();
       res.status(400).json({ error: errorMessage });
       return;
     }
-    
+
     const newItem = await projectsRepository.createProjectItem(validationResult.data);
+
+    // Log activity
+    await activityLogsRepository.logActivity({
+      entity_type: "project",
+      entity_id: projectId,
+      action_type: "created",
+      user_id: req.body.user_id || null,
+      field_changed: "item",
+      old_value: null,
+      new_value: newItem.name,
+      description: `Добавлена позиция "${newItem.name}"`,
+    });
+
     res.status(201).json(newItem);
   } catch (error) {
     console.error("Error creating project item:", error);
@@ -503,23 +757,35 @@ router.post("/api/projects/:projectId/items", async (req, res) => {
 // PUT /api/projects/:projectId/items/:itemId - Update item
 router.put("/api/projects/:projectId/items/:itemId", async (req, res) => {
   try {
-    const { itemId } = req.params;
-    
+    const { itemId, projectId } = req.params;
+
     const validationResult = insertProjectItemSchema.partial().safeParse(req.body);
-    
+
     if (!validationResult.success) {
       const errorMessage = fromZodError(validationResult.error).toString();
       res.status(400).json({ error: errorMessage });
       return;
     }
-    
+
     const updatedItem = await projectsRepository.updateProjectItem(itemId, validationResult.data);
-    
+
     if (!updatedItem) {
       res.status(404).json({ error: "Project item not found" });
       return;
     }
-    
+
+    // Log activity
+    await activityLogsRepository.logActivity({
+      entity_type: "project",
+      entity_id: projectId,
+      action_type: "updated",
+      user_id: req.body.user_id || null,
+      field_changed: "item",
+      old_value: null,
+      new_value: updatedItem.name,
+      description: `Обновлена позиция "${updatedItem.name}"`,
+    });
+
     res.json(updatedItem);
   } catch (error) {
     console.error("Error updating project item:", error);
@@ -530,14 +796,33 @@ router.put("/api/projects/:projectId/items/:itemId", async (req, res) => {
 // DELETE /api/projects/:projectId/items/:itemId - Delete item
 router.delete("/api/projects/:projectId/items/:itemId", async (req, res) => {
   try {
-    const { itemId } = req.params;
+    const { itemId, projectId } = req.params;
+
+    // Get item info before deleting
+    const item = await db.select().from(project_items).where(eq(project_items.id, itemId)).limit(1);
+    const itemInfo = item[0];
+
     const deleted = await projectsRepository.deleteProjectItem(itemId);
-    
+
     if (!deleted) {
       res.status(404).json({ error: "Project item not found" });
       return;
     }
-    
+
+    // Log activity
+    if (itemInfo) {
+      await activityLogsRepository.logActivity({
+        entity_type: "project",
+        entity_id: projectId,
+        action_type: "deleted",
+        user_id: req.body.user_id || null,
+        field_changed: "item",
+        old_value: itemInfo.name,
+        new_value: null,
+        description: `Удалена позиция "${itemInfo.name}"`,
+      });
+    }
+
     res.status(204).send();
   } catch (error) {
     console.error("Error deleting project item:", error);
@@ -791,13 +1076,30 @@ router.post("/api/process-templates/:templateId/apply", async (req, res) => {
   try {
     const { templateId } = req.params;
     const { item_id } = req.body;
-    
+
     if (!item_id) {
       res.status(400).json({ error: "item_id is required" });
       return;
     }
-    
+
+    const template = await projectsRepository.getTemplateById(templateId);
     const result = await projectsRepository.applyTemplateToItem(templateId, item_id);
+
+    // Get project_id from item
+    const itemData = await db.select().from(project_items).where(eq(project_items.id, item_id)).limit(1);
+    if (itemData[0] && template) {
+      await activityLogsRepository.logActivity({
+        entity_type: "project",
+        entity_id: itemData[0].project_id,
+        action_type: "created",
+        user_id: req.body.user_id || null,
+        field_changed: "business_process",
+        old_value: null,
+        new_value: template.name,
+        description: `Применён бизнес-процесс "${template.name}"`,
+      });
+    }
+
     res.status(201).json(result);
   } catch (error) {
     console.error("Error applying template:", error);
@@ -950,24 +1252,63 @@ router.get("/api/stages/:stageId/messages", async (req, res) => {
 router.post("/api/stages/:stageId/messages", async (req, res) => {
   try {
     const { stageId } = req.params;
-    
+
     const validationResult = insertStageMessageSchema.safeParse({
       stage_id: stageId,
       user_id: req.body.user_id,
       message: req.body.message
     });
-    
+
     if (!validationResult.success) {
       const errorMessage = fromZodError(validationResult.error).toString();
       res.status(400).json({ error: errorMessage });
       return;
     }
-    
+
     const newMessage = await projectsRepository.createStageMessage(validationResult.data);
     res.status(201).json(newMessage);
   } catch (error) {
     console.error("Error creating stage message:", error);
     res.status(500).json({ error: "Failed to create stage message" });
+  }
+});
+
+// ===== Project Messages Routes =====
+
+// GET /api/projects/:projectId/messages - Get project messages
+router.get("/api/projects/:projectId/messages", async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const messages = await projectsRepository.getProjectMessages(projectId);
+    res.json(messages);
+  } catch (error) {
+    console.error("Error fetching project messages:", error);
+    res.status(500).json({ error: "Failed to fetch project messages" });
+  }
+});
+
+// POST /api/projects/:projectId/messages - Create project message
+router.post("/api/projects/:projectId/messages", async (req, res) => {
+  try {
+    const { projectId } = req.params;
+
+    const validationResult = insertProjectMessageSchema.safeParse({
+      project_id: projectId,
+      user_id: req.body.user_id,
+      message: req.body.message
+    });
+
+    if (!validationResult.success) {
+      const errorMessage = fromZodError(validationResult.error).toString();
+      res.status(400).json({ error: errorMessage });
+      return;
+    }
+
+    const newMessage = await projectsRepository.createProjectMessage(validationResult.data);
+    res.status(201).json(newMessage);
+  } catch (error) {
+    console.error("Error creating project message:", error);
+    res.status(500).json({ error: "Failed to create project message" });
   }
 });
 

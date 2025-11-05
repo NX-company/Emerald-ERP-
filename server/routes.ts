@@ -21,9 +21,14 @@ import { router as templatesRouter } from "./modules/templates/routes";
 import salesPipelinesRouter from "./modules/sales-pipelines/routes";
 import dealContactsRouter from "./modules/deal-contacts/routes";
 import aiRouter from "./modules/ai/routes";
+import stageTypesRouter from "./modules/stage-types/routes";
+import stageDocumentsRouter from "./modules/stage-documents/routes";
+import stageMediaCommentsRouter from "./modules/stage-media-comments/routes";
+import { router as authRouter } from "./modules/auth/routes";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Register all modular routes (они уже содержат префикс /api)
+  app.use(authRouter);
   app.use(salesRouter);
   app.use(projectsRouter);
   app.use(productionRouter);
@@ -42,6 +47,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use('/api/sales-pipelines', salesPipelinesRouter);
   app.use(dealContactsRouter);
   app.use(aiRouter);
+  app.use(stageTypesRouter);
+  app.use(stageDocumentsRouter);
+  app.use(stageMediaCommentsRouter);
 
   const httpServer = createServer(app);
 

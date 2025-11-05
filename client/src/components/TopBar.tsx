@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 import { Bell, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ThemeToggle } from "./ThemeToggle";
 import { UserAvatar } from "./UserAvatar";
 import { SidebarTrigger } from "@/components/ui/sidebar";
+import { useToast } from "@/hooks/use-toast";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,10 +26,51 @@ import {
 
 export function TopBar() {
   const [searchOpen, setSearchOpen] = useState(false);
+  const [userRole, setUserRole] = useState<any>(null);
+  const [userName, setUserName] = useState<string>("Пользователь");
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
+
+  useEffect(() => {
+    const role = localStorage.getItem("userRole");
+    const user = localStorage.getItem("user");
+
+    if (role) {
+      setUserRole(JSON.parse(role));
+    }
+
+    if (user) {
+      const userData = JSON.parse(user);
+      setUserName(userData.full_name || userData.username || "Пользователь");
+    }
+  }, []);
+
+  // Скрываем toggle sidebar для роли замерщика
+  const showSidebarToggle = userRole?.name !== 'Замерщик';
+
+  // Функция выхода из системы
+  const handleLogout = () => {
+    // Очищаем localStorage
+    localStorage.removeItem("user");
+    localStorage.removeItem("userRole");
+    localStorage.removeItem("userPermissions");
+    localStorage.removeItem("currentUserId");
+
+    // Показываем уведомление
+    toast({
+      description: "Вы успешно вышли из системы",
+    });
+
+    // Перенаправляем на страницу входа
+    setLocation("/login");
+
+    // Перезагружаем страницу
+    window.location.reload();
+  };
 
   return (
     <header className="sticky top-0 z-50 flex h-16 items-center gap-2 md:gap-4 border-b bg-background px-4 md:px-6">
-      <SidebarTrigger data-testid="button-sidebar-toggle" />
+      {showSidebarToggle && <SidebarTrigger data-testid="button-sidebar-toggle" />}
       
       {/* Desktop Search - visible on md and above */}
       <div className="hidden md:flex flex-1 items-center gap-4">
@@ -125,13 +168,13 @@ export function TopBar() {
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               className="gap-2 hover-elevate active-elevate-2"
               data-testid="button-user-menu"
             >
-              <UserAvatar name="Иван Петров" size="sm" />
-              <span className="hidden md:inline text-sm">Иван Петров</span>
+              <UserAvatar name={userName} size="sm" />
+              <span className="hidden md:inline text-sm">{userName}</span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
@@ -140,7 +183,9 @@ export function TopBar() {
             <DropdownMenuItem className="cursor-pointer">Профиль</DropdownMenuItem>
             <DropdownMenuItem className="cursor-pointer">Настройки</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="cursor-pointer">Выйти</DropdownMenuItem>
+            <DropdownMenuItem className="cursor-pointer" onClick={handleLogout}>
+              Выйти
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

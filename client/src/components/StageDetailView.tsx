@@ -11,6 +11,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Calendar, DollarSign, Send, Paperclip, FileText, Download, Play, CheckCircle, Upload, Image, FileSpreadsheet, File, Link2, TrendingUp } from "lucide-react";
 import type { ProjectStage } from "@shared/schema";
+import { MeasurementStageForm, type MeasurementStageData } from "./MeasurementStageForm";
 
 interface StageDetailViewProps {
   stageId: string;
@@ -145,6 +146,23 @@ export function StageDetailView({
     },
   });
 
+  const updateMeasurementDataMutation = useMutation({
+    mutationFn: async (data: MeasurementStageData) => {
+      await apiRequest("PUT", `/api/projects/stages/${stageId}`, {
+        type_data: JSON.stringify(data)
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/projects/stages", stageId] });
+      if (projectId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "stages"] });
+      }
+    },
+    onError: (error: Error) => {
+      toast({ description: error.message || "Ошибка сохранения данных", variant: "destructive" });
+    },
+  });
+
   const updateStatusMutation = useMutation({
     mutationFn: async (status: string) => {
       await apiRequest("PUT", `/api/projects/stages/${stageId}`, { status });
@@ -269,18 +287,20 @@ export function StageDetailView({
   };
 
   return (
-    <div className="space-y-4">
-      <Card className={`border-l-4 ${
+    <div className="grid grid-cols-2 gap-4">
+      {/* Left column: Basic info + Measurement form */}
+      <div className="space-y-4">
+        <Card className={`border-l-4 ${
         currentStatus === 'completed' ? 'border-green-500 bg-green-50/30 dark:bg-green-950/20' :
         currentStatus === 'in_progress' ? 'border-blue-500 bg-blue-50/30 dark:bg-blue-950/20' :
         'border-gray-400 bg-accent/30'
       }`}>
-        <CardHeader>
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex-1">
-              <CardTitle>{stageName}</CardTitle>
+        <CardHeader className="pb-2 pt-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              <CardTitle className="text-base">{stageName}</CardTitle>
               {stageDescription && (
-                <p className="text-sm text-muted-foreground mt-2">{stageDescription}</p>
+                <p className="text-sm text-muted-foreground mt-1">{stageDescription}</p>
               )}
             </div>
             <Select value={currentStatus} onValueChange={handleStatusChange}>
@@ -295,8 +315,8 @@ export function StageDetailView({
             </Select>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex gap-4 text-sm text-muted-foreground">
+        <CardContent className="space-y-3 pb-3">
+          <div className="flex gap-3 text-sm text-muted-foreground">
             {stageDeadline && (
               <div className="flex items-center gap-1">
                 <Calendar className="w-4 h-4" />
@@ -313,7 +333,7 @@ export function StageDetailView({
 
           {stage && (
             <div className="space-y-2">
-              <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="grid grid-cols-2 gap-2 text-sm">
                 {stage.planned_start_date && (
                   <div>
                     <p className="text-muted-foreground">План начала</p>
@@ -431,18 +451,30 @@ export function StageDetailView({
             </div>
           )}
         </CardContent>
-      </Card>
+        </Card>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base">Документы этапа</CardTitle>
+        {/* Measurement form for measurement stages */}
+        {stage && stage.stage_type_id && (
+          <MeasurementStageForm
+            stage={stage}
+            onDataChange={(data) => updateMeasurementDataMutation.mutate(data)}
+            readOnly={stage.status === 'completed'}
+          />
+        )}
+      </div>
+
+      {/* Right column: Documents + Chat */}
+      <div className="space-y-4">
+        <Card>
+          <CardHeader className="pb-2 pt-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm">Документы этапа</CardTitle>
             <Badge variant="secondary" className="text-xs">
               {documents.length}
             </Badge>
           </div>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-2 pb-3">
           {documents.length === 0 ? (
             <div className="text-center py-6">
               <FileText className="w-12 h-12 mx-auto text-muted-foreground/50 mb-2" />
@@ -525,15 +557,15 @@ export function StageDetailView({
 
       {projectId && allProjectDocuments.length > 0 && (
         <Card>
-          <CardHeader>
+          <CardHeader className="pb-2 pt-3">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-base">Все документы проекта</CardTitle>
+              <CardTitle className="text-sm">Все документы проекта</CardTitle>
               <Badge variant="secondary" className="text-xs">
                 {allProjectDocuments.length}
               </Badge>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pb-3">
             <ScrollArea className="h-[200px]">
               <div className="space-y-2 pr-4">
                 {allProjectDocuments.map((doc: any) => (
@@ -567,15 +599,15 @@ export function StageDetailView({
       )}
 
       <Card>
-        <CardHeader>
+        <CardHeader className="pb-2 pt-3">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-base">Чат этапа</CardTitle>
+            <CardTitle className="text-sm">Чат этапа</CardTitle>
             <Badge variant="secondary" className="text-xs">
               {messages.length}
             </Badge>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-3 pb-3">
           <ScrollArea className="h-[300px] pr-4">
             <div className="space-y-3">
               {messages.length === 0 ? (
@@ -647,6 +679,7 @@ export function StageDetailView({
           </div>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }

@@ -201,7 +201,7 @@ export class ActivityLogsRepository {
   }
 
   // Get activity logs for an entity
-  async getActivityLogs(entityType: string, entityId: string): Promise<any[]> {
+  async getActivityLogs(entityType: string, entityId: string, limit: number = 30): Promise<any[]> {
     const result = await db
       .select()
       .from(activity_logs)
@@ -212,7 +212,8 @@ export class ActivityLogsRepository {
           eq(activity_logs.entity_id, entityId)
         )
       )
-      .orderBy(desc(activity_logs.created_at));
+      .orderBy(desc(activity_logs.created_at))
+      .limit(limit);
 
     return result.map(r => ({
       ...r.activity_logs,
