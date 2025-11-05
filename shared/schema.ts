@@ -178,7 +178,9 @@ export const deal_documents = pgTable('deal_documents', {
   updated_at: timestamp('updated_at').$defaultFn(() => new Date()).notNull(),
 });
 
-export const insertDealDocumentSchema = createInsertSchema(deal_documents).omit({ id: true, created_at: true, updated_at: true });
+export const insertDealDocumentSchema = createInsertSchema(deal_documents).omit({ id: true, created_at: true, updated_at: true }).extend({
+  is_signed: z.union([z.boolean(), z.number()]).transform(val => typeof val === 'boolean' ? (val ? 1 : 0) : val).optional(),
+});
 export type InsertDealDocument = z.infer<typeof insertDealDocumentSchema>;
 export type DealDocument = typeof deal_documents.$inferSelect;
 
