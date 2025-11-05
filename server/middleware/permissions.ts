@@ -26,20 +26,21 @@ export function checkPermission(permission: PermissionType) {
       }
 
       // Admin user has all permissions
-      if (user.username === 'admin') {
+      if (user.username.toLowerCase() === 'admin') {
         (req as any).currentUser = user;
         return next();
       }
 
       // Check permissions through role_permissions table
       if (user.role_id) {
+        // Support both 'deals' and 'sales' module names for compatibility
         const [rolePermission] = await db
           .select()
           .from(role_permissions)
           .where(
             and(
               eq(role_permissions.role_id, user.role_id),
-              eq(role_permissions.module, 'deals')
+              eq(role_permissions.module, 'sales')
             )
           );
 
