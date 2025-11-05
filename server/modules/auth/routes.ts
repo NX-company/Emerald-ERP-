@@ -63,8 +63,22 @@ router.post("/api/auth/login", async (req, res) => {
     // Вернуть данные пользователя (без пароля)
     const { password: _, ...userWithoutPassword } = user;
 
+    // Map permissions to boolean flags for frontend
+    const salesPerms = permissions.find(p => p.module === 'sales');
+    const projectsPerms = permissions.find(p => p.module === 'projects');
+
     res.json({
-      user: userWithoutPassword,
+      user: {
+        ...userWithoutPassword,
+        can_create_deals: salesPerms?.can_create || false,
+        can_edit_deals: salesPerms?.can_edit || false,
+        can_delete_deals: salesPerms?.can_delete || false,
+        can_view_deals: salesPerms?.can_view || false,
+        can_create_projects: projectsPerms?.can_create || false,
+        can_edit_projects: projectsPerms?.can_edit || false,
+        can_delete_projects: projectsPerms?.can_delete || false,
+        can_view_projects: projectsPerms?.can_view || false,
+      },
       role: userRole,
       permissions: permissions,
     });
