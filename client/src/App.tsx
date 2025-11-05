@@ -12,6 +12,9 @@ import Projects from "@/pages/Projects";
 import ProjectDetailPage from "@/pages/ProjectDetailPage";
 import Production from "@/pages/Production";
 import Warehouse from "@/pages/Warehouse";
+import Shipments from "@/pages/Shipments";
+import ShipmentScanner from "@/pages/ShipmentScanner";
+import ShipmentDetail from "@/pages/ShipmentDetail";
 import Finance from "@/pages/Finance";
 import Installation from "@/pages/Installation";
 import Mail from "@/pages/Mail";
@@ -34,6 +37,9 @@ function Router() {
       <Route path="/projects" component={Projects} />
       <Route path="/production" component={Production} />
       <Route path="/warehouse" component={Warehouse} />
+      <Route path="/shipments/new" component={ShipmentScanner} />
+      <Route path="/shipments/:id" component={ShipmentDetail} />
+      <Route path="/shipments" component={Shipments} />
       <Route path="/finance" component={Finance} />
       <Route path="/installation" component={Installation} />
       <Route path="/mail" component={Mail} />

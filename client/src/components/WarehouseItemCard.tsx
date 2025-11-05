@@ -6,25 +6,35 @@ import { Button } from "@/components/ui/button";
 interface WarehouseItemCardProps {
   id: string;
   name: string;
+  sku?: string | null;
+  barcode?: string | null;
   quantity: number;
   unit: string;
+  price?: number | null;
   location: string | null;
   category: "materials" | "products";
+  supplier?: string | null;
+  description?: string | null;
   status: "normal" | "low" | "critical";
   minStock: number;
   onClick?: () => void;
 }
 
-export function WarehouseItemCard({ 
-  id, 
-  name, 
-  quantity, 
-  unit, 
-  location, 
-  category, 
-  status, 
+export function WarehouseItemCard({
+  id,
+  name,
+  sku,
+  barcode,
+  quantity,
+  unit,
+  price,
+  location,
+  category,
+  supplier,
+  description,
+  status,
   minStock,
-  onClick 
+  onClick
 }: WarehouseItemCardProps) {
   const statusConfig = {
     normal: { 
@@ -66,6 +76,9 @@ export function WarehouseItemCard({
             <h3 className="font-semibold text-base truncate" data-testid={`text-warehouse-item-name-${id}`}>
               {name}
             </h3>
+            {sku && (
+              <p className="text-xs text-muted-foreground mt-0.5">Арт: {sku}</p>
+            )}
             <div className="flex items-center gap-2 mt-1">
               <Badge variant="outline" className="text-xs" data-testid={`badge-warehouse-category-${id}`}>
                 {categoryLabels[category]}
@@ -86,6 +99,12 @@ export function WarehouseItemCard({
             {unit}
           </span>
         </div>
+
+        {price !== null && price !== undefined && price > 0 && (
+          <div className="text-sm text-muted-foreground">
+            Цена: <span className="font-medium">{price} ₽/{unit}</span>
+          </div>
+        )}
 
         {location && (
           <div className="flex items-center gap-1 text-sm text-muted-foreground">

@@ -1,9 +1,10 @@
-import { 
+import {
   LayoutDashboard,
   ShoppingCart,
   FolderKanban,
   Factory,
   Package,
+  Truck,
   DollarSign,
   Hammer,
   Mail,
@@ -33,6 +34,7 @@ const modules = [
   { title: "Проекты", url: "/projects", icon: FolderKanban },
   { title: "Производство", url: "/production", icon: Factory },
   { title: "Склад", url: "/warehouse", icon: Package },
+  { title: "Отгрузки", url: "/shipments", icon: Truck },
   { title: "Финансы", url: "/finance", icon: DollarSign },
   { title: "Монтаж", url: "/installation", icon: Hammer },
 ];

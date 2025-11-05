@@ -373,17 +373,56 @@ export type ProductionStage = typeof production_stages.$inferSelect;
 export const warehouse_items = sqliteTable('warehouse_items', {
   id: text('id').$defaultFn(() => genId()).primaryKey(),
   name: text('name').notNull(),
+  sku: text('sku'),
+  barcode: text('barcode'),
   quantity: real('quantity').notNull().default(0),
+  reserved_quantity: real('reserved_quantity').notNull().default(0),
   unit: text('unit').notNull(),
+  price: real('price').default(0),
   location: text('location'),
   category: text('category').notNull(),
+  supplier: text('supplier'),
+  description: text('description'),
   min_stock: real('min_stock').default(0),
+  track_min_stock: integer('track_min_stock', { mode: 'boolean' }).default(0).notNull(),
   status: text('status').notNull().default('normal'),
+  project_id: text('project_id').references(() => projects.id, { onDelete: 'set null' }),
+  project_name: text('project_name'), // Название проекта для упаковок
+  package_details: text('package_details'), // JSON с деталями упаковки
   created_at: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
   updated_at: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
 });
 
-export const insertWarehouseItemSchema = createInsertSchema(warehouse_items).omit({ id: true, created_at: true, updated_at: true });
+export const insertWarehouseItemSchema = createInsertSchema(warehouse_items)
+  .omit({ id: true, created_at: true, updated_at: true })
+  .extend({
+    quantity: z.union([z.string(), z.number()]).transform(val => typeof val === 'string' ? parseFloat(val) : val),
+    reserved_quantity: z.union([z.string(), z.number(), z.null(), z.undefined()]).optional().transform(val => {
+      if (val === null || val === undefined || val === '') return 0;
+      return typeof val === 'string' ? parseFloat(val) : val;
+    }),
+    price: z.union([z.string(), z.number(), z.null(), z.undefined()]).optional().transform(val => {
+      if (val === null || val === undefined || val === '') return 0;
+      return typeof val === 'string' ? parseFloat(val) : val;
+    }),
+    min_stock: z.union([z.string(), z.number(), z.null(), z.undefined()]).optional().transform(val => {
+      if (val === null || val === undefined || val === '') return 0;
+      return typeof val === 'string' ? parseFloat(val) : val;
+    }),
+    track_min_stock: z.union([z.boolean(), z.number(), z.null(), z.undefined()]).optional().transform(val => {
+      if (val === null || val === undefined) return false;
+      if (typeof val === 'number') return val === 1;
+      return val;
+    }),
+    sku: z.string().optional().nullable(),
+    barcode: z.string().optional().nullable(),
+    supplier: z.string().optional().nullable(),
+    description: z.string().optional().nullable(),
+    location: z.string().optional().nullable(),
+    project_id: z.string().optional().nullable(),
+    project_name: z.string().optional().nullable(),
+    package_details: z.string().optional().nullable(),
+  });
 export type InsertWarehouseItem = z.infer<typeof insertWarehouseItemSchema>;
 export type WarehouseItem = typeof warehouse_items.$inferSelect;
 
@@ -402,6 +441,97 @@ export const warehouse_transactions = sqliteTable('warehouse_transactions', {
 export const insertWarehouseTransactionSchema = createInsertSchema(warehouse_transactions).omit({ id: true, created_at: true });
 export type InsertWarehouseTransaction = z.infer<typeof insertWarehouseTransactionSchema>;
 export type WarehouseTransaction = typeof warehouse_transactions.$inferSelect;
+
+// Warehouse Reservations
+export const warehouse_reservations = sqliteTable('warehouse_reservations', {
+  id: text('id').$defaultFn(() => genId()).primaryKey(),
+  item_id: text('item_id').references(() => warehouse_items.id, { onDelete: 'cascade' }).notNull(),
+  project_id: text('project_id').references(() => projects.id, { onDelete: 'cascade' }).notNull(),
+  quantity: real('quantity').notNull(),
+  status: text('status').notNull().default('pending'), // pending | confirmed | released | cancelled
+  reserved_by: text('reserved_by').references(() => users.id),
+  reason: text('reason'),
+  notes: text('notes'),
+  created_at: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
+  updated_at: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
+  released_at: integer('released_at', { mode: 'timestamp' }),
+});
+
+export const insertWarehouseReservationSchema = createInsertSchema(warehouse_reservations, {
+  quantity: z.number().positive("Количество должно быть больше 0"),
+  status: z.enum(["pending", "confirmed", "released", "cancelled"]).optional(),
+  reserved_by: z.string().optional(),
+  reason: z.string().optional(),
+  notes: z.string().optional(),
+}).omit({
+  id: true,
+  created_at: true,
+  updated_at: true,
+  released_at: true,
+});
+
+export type WarehouseReservation = typeof warehouse_reservations.$inferSelect;
+export type InsertWarehouseReservation = z.infer<typeof insertWarehouseReservationSchema>;
+
+// Shipments (Накладные на отгрузку)
+export const shipments = sqliteTable('shipments', {
+  id: text('id').$defaultFn(() => genId()).primaryKey(),
+  shipment_number: text('shipment_number').notNull().unique(),
+  project_name: text('project_name').notNull(),
+  delivery_address: text('delivery_address'),
+  warehouse_keeper: text('warehouse_keeper').notNull(),
+  status: text('status').notNull().default('draft'), // draft | confirmed | cancelled
+  notes: text('notes'),
+  created_by: text('created_by').notNull().references(() => users.id),
+  created_at: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
+  confirmed_at: integer('confirmed_at', { mode: 'timestamp' }),
+  cancelled_at: integer('cancelled_at', { mode: 'timestamp' }),
+  updated_at: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
+});
+
+export const insertShipmentSchema = createInsertSchema(shipments, {
+  shipment_number: z.string().optional(),
+  project_name: z.string().min(1, "Укажите проект"),
+  delivery_address: z.string().optional(),
+  warehouse_keeper: z.string().min(1, "Укажите ФИО кладовщика"),
+  status: z.enum(["draft", "confirmed", "cancelled"]).optional(),
+  notes: z.string().optional(),
+}).omit({
+  id: true,
+  created_at: true,
+  updated_at: true,
+  confirmed_at: true,
+  cancelled_at: true,
+});
+
+export type Shipment = typeof shipments.$inferSelect;
+export type InsertShipment = z.infer<typeof insertShipmentSchema>;
+
+// Shipment Items (Позиции накладной)
+export const shipment_items = sqliteTable('shipment_items', {
+  id: text('id').$defaultFn(() => genId()).primaryKey(),
+  shipment_id: text('shipment_id').notNull().references(() => shipments.id, { onDelete: 'cascade' }),
+  item_id: text('item_id').notNull().references(() => warehouse_items.id),
+  item_name: text('item_name').notNull(),
+  item_sku: text('item_sku'),
+  quantity: real('quantity').notNull(),
+  unit: text('unit').notNull(),
+  is_package: integer('is_package', { mode: 'boolean' }).default(false),
+  package_details: text('package_details'),
+  created_at: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
+});
+
+export const insertShipmentItemSchema = createInsertSchema(shipment_items, {
+  quantity: z.number().positive("Количество должно быть больше 0"),
+  is_package: z.boolean().optional(),
+  package_details: z.string().optional(),
+}).omit({
+  id: true,
+  created_at: true,
+});
+
+export type ShipmentItem = typeof shipment_items.$inferSelect;
+export type InsertShipmentItem = z.infer<typeof insertShipmentItemSchema>;
 
 // Financial Transactions
 export const financial_transactions = sqliteTable('financial_transactions', {
@@ -696,3 +826,20 @@ export const activity_logs = sqliteTable('activity_logs', {
 export const insertActivityLogSchema = createInsertSchema(activity_logs).omit({ id: true, created_at: true });
 export type InsertActivityLog = z.infer<typeof insertActivityLogSchema>;
 export type ActivityLog = typeof activity_logs.$inferSelect;
+
+// Stock Notifications (уведомления о минимальном остатке)
+export const stock_notifications = sqliteTable('stock_notifications', {
+  id: text('id').$defaultFn(() => genId()).primaryKey(),
+  item_id: text('item_id').references(() => warehouse_items.id, { onDelete: 'cascade' }).notNull(),
+  item_name: text('item_name').notNull(),
+  status: text('status').notNull(), // low | critical
+  quantity: real('quantity').notNull(),
+  min_stock: real('min_stock').notNull(),
+  user_id: text('user_id').references(() => users.id), // кому отправлено
+  read: integer('read', { mode: 'boolean' }).default(0).notNull(),
+  created_at: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()).notNull(),
+});
+
+export const insertStockNotificationSchema = createInsertSchema(stock_notifications).omit({ id: true, created_at: true });
+export type InsertStockNotification = z.infer<typeof insertStockNotificationSchema>;
+export type StockNotification = typeof stock_notifications.$inferSelect;

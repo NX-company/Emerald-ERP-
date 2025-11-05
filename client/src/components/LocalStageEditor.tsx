@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Trash2, Link2, X, FileText, Download, GripVertical, ChevronDown, ChevronRight } from "lucide-react";
@@ -443,6 +443,14 @@ export function LocalStageEditor({
   const [newStageName, setNewStageName] = useState("");
   const [showTypeDialog, setShowTypeDialog] = useState(false);
   const [selectedTypeId, setSelectedTypeId] = useState<string | null>(null);
+
+  // Логирование при получении новых props
+  useEffect(() => {
+    console.log("[LocalStageEditor] Получены props для позиции:", positionName);
+    console.log("[LocalStageEditor] Количество этапов:", stages.length);
+    console.log("[LocalStageEditor] Этапы:", stages);
+    console.log("[LocalStageEditor] Зависимости:", dependencies);
+  }, [stages, dependencies, positionName]);
 
   // Загружаем типы этапов
   const { data: stageTypes = [] } = useQuery<StageType[]>({
