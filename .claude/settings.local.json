@@ -37,7 +37,8 @@
       "Bash(node test_project_creation.mjs:*)",
       "Bash(node test_project_creation_simple.mjs:*)",
       "Bash(node test_stage_update_simple.mjs:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(node check_timestamp.mjs:*)"
     ],
     "deny": [],
     "ask": []

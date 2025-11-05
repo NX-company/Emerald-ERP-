@@ -290,18 +290,29 @@ export function CreateProjectDialog({
 
     setIsApplyingTemplate(true);
     try {
+      console.log("=== ПРИМЕНЕНИЕ ШАБЛОНА ===");
+      console.log("Template ID:", selectedTemplateId);
+      console.log("Position Index:", selectedPositionForStages);
+
       const response = await apiRequest<any>(
         "GET",
         `/api/templates/${selectedTemplateId}`
       );
       const data = response;
 
+      console.log("Получены данные от API:", data);
+      console.log("data.stages:", data?.stages);
+      console.log("data.dependencies:", data?.dependencies);
+
       // API returns { template, stages, dependencies }
       if (!data || !data.stages || !Array.isArray(data.stages)) {
+        console.error("Неправильная структура данных:", { data, hasStages: !!data?.stages, isArray: Array.isArray(data?.stages) });
         throw new Error("Invalid template data structure");
       }
 
       const { template, stages, dependencies = [] } = data;
+      console.log("Этапов в шаблоне:", stages.length);
+      console.log("Зависимостей в шаблоне:", dependencies.length);
 
       // Create stage ID mapping with crypto.randomUUID() for uniqueness
       const stageIdMap: Record<string, string> = {};
@@ -323,6 +334,8 @@ export function CreateProjectDialog({
         return stageObj;
       });
 
+      console.log("Создано localStages:", localStages);
+
       // Map dependencies with validation - skip invalid dependencies
       const localDependencies: LocalStageDependency[] = dependencies
         .filter((dep: any) => {
@@ -337,14 +350,22 @@ export function CreateProjectDialog({
           depends_on_stage_id: stageIdMap[dep.depends_on_template_stage_id],
         }));
 
-      setPositionStagesData(prev => ({
-        ...prev,
-        [selectedPositionForStages]: {
-          stages: localStages,
-          dependencies: localDependencies,
-        }
-      }));
+      console.log("Создано localDependencies:", localDependencies);
 
+      setPositionStagesData(prev => {
+        const newData = {
+          ...prev,
+          [selectedPositionForStages]: {
+            stages: localStages,
+            dependencies: localDependencies,
+          }
+        };
+        console.log("Обновляем positionStagesData:", newData);
+        console.log("Для позиции", selectedPositionForStages, ":", newData[selectedPositionForStages]);
+        return newData;
+      });
+
+      console.log("=== ШАБЛОН ПРИМЕНЁН УСПЕШНО ===");
       toast({ description: `Шаблон "${template.name}" применён` });
       setSelectedTemplateId("");
     } catch (error) {

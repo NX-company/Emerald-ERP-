@@ -1,6 +1,6 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
@@ -25,10 +25,13 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2 } from "lucide-react";
-import { insertWarehouseItemSchema } from "@shared/schema";
+import { insertWarehouseItemSchema, type Project } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { FormDescription } from "@/components/ui/form";
 
 interface WarehouseItemCreateDialogProps {
   open: boolean;
@@ -38,16 +41,26 @@ interface WarehouseItemCreateDialogProps {
 export function WarehouseItemCreateDialog({ open, onOpenChange }: WarehouseItemCreateDialogProps) {
   const { toast } = useToast();
 
+  const { data: projects = [] } = useQuery<Project[]>({
+    queryKey: ["/api/projects"],
+  });
+
   const form = useForm({
     resolver: zodResolver(insertWarehouseItemSchema),
     defaultValues: {
       name: "",
-      quantity: "0",
+      sku: "",
+      quantity: 0,
       unit: "шт",
+      price: 0,
       location: "",
       category: "materials" as const,
-      min_stock: "0",
+      supplier: "",
+      description: "",
+      min_stock: 0,
+      track_min_stock: false,
       status: "normal" as const,
+      project_id: null,
     },
   });
 
@@ -55,8 +68,15 @@ export function WarehouseItemCreateDialog({ open, onOpenChange }: WarehouseItemC
     mutationFn: async (data: any) => {
       const itemData = {
         ...data,
+        sku: data.sku || undefined,
+        quantity: Number(data.quantity) || 0,
+        price: Number(data.price) || 0,
         location: data.location || null,
-        min_stock: data.min_stock || "0",
+        supplier: data.supplier || null,
+        description: data.description || null,
+        min_stock: Number(data.min_stock) || 0,
+        track_min_stock: data.track_min_stock || false,
+        project_id: data.project_id || null,
       };
       await apiRequest("POST", "/api/warehouse/items", itemData);
     },
@@ -102,12 +122,53 @@ export function WarehouseItemCreateDialog({ open, onOpenChange }: WarehouseItemC
                 <FormItem>
                   <FormLabel>Название</FormLabel>
                   <FormControl>
-                    <Input 
-                      {...field} 
-                      placeholder="Название позиции" 
+                    <Input
+                      {...field}
+                      placeholder="Название позиции"
                       data-testid="input-warehouse-name"
                     />
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="sku"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Артикул (опционально)</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      placeholder="Будет сгенерирован автоматически"
+                      data-testid="input-warehouse-sku"
+                    />
+                  </FormControl>
+                  <FormDescription>Уникальный код товара для идентификации</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="price"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Цена за единицу</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      data-testid="input-warehouse-price"
+                      value={field.value}
+                      onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : 0)}
+                    />
+                  </FormControl>
+                  <FormDescription>Цена в рублях за единицу измерения</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -121,12 +182,13 @@ export function WarehouseItemCreateDialog({ open, onOpenChange }: WarehouseItemC
                   <FormItem>
                     <FormLabel>Количество</FormLabel>
                     <FormControl>
-                      <Input 
-                        {...field} 
-                        type="number" 
+                      <Input
+                        type="number"
                         step="0.01"
-                        placeholder="0" 
+                        placeholder="0"
                         data-testid="input-warehouse-quantity"
+                        value={field.value}
+                        onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : 0)}
                       />
                     </FormControl>
                     <FormMessage />
@@ -205,19 +267,119 @@ export function WarehouseItemCreateDialog({ open, onOpenChange }: WarehouseItemC
               )}
             />
 
+            {form.watch("category") === "products" && (
+              <FormField
+                control={form.control}
+                name="project_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Проект (опционально)</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value || undefined}
+                    >
+                      <FormControl>
+                        <SelectTrigger data-testid="select-warehouse-project">
+                          <SelectValue placeholder="Выберите проект" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">Без проекта</SelectItem>
+                        {projects.map((project) => (
+                          <SelectItem key={project.id} value={project.id}>
+                            {project.name} {project.client ? `(${project.client})` : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>
+                      Привязка готовой продукции к проекту
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
             <FormField
               control={form.control}
-              name="min_stock"
+              name="track_min_stock"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                      data-testid="checkbox-warehouse-track-min-stock"
+                    />
+                  </FormControl>
+                  <div className="space-y-1 leading-none">
+                    <FormLabel>
+                      Отслеживать минимальный остаток
+                    </FormLabel>
+                    <FormDescription>
+                      Получать уведомление, когда остаток товара опускается ниже минимального
+                    </FormDescription>
+                  </div>
+                </FormItem>
+              )}
+            />
+
+            {form.watch("track_min_stock") && (
+              <FormField
+                control={form.control}
+                name="min_stock"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Минимальный остаток</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="0"
+                        data-testid="input-warehouse-min-stock"
+                        value={field.value}
+                        onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : 0)}
+                      />
+                    </FormControl>
+                    <FormDescription>Укажите минимальное количество для отслеживания</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
+            <FormField
+              control={form.control}
+              name="supplier"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Минимальный остаток</FormLabel>
+                  <FormLabel>Поставщик (опционально)</FormLabel>
                   <FormControl>
-                    <Input 
-                      {...field} 
-                      type="number" 
-                      step="0.01"
-                      placeholder="0" 
-                      data-testid="input-warehouse-min-stock"
+                    <Input
+                      {...field}
+                      placeholder="Название поставщика"
+                      data-testid="input-warehouse-supplier"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Описание (опционально)</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      {...field}
+                      placeholder="Дополнительная информация о товаре"
+                      className="resize-none"
+                      rows={3}
+                      data-testid="textarea-warehouse-description"
                     />
                   </FormControl>
                   <FormMessage />

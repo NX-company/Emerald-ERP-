@@ -318,3 +318,22 @@
     inset: -1px;
   }
 }
+
+/* Print styles for shipment documents */
+@media print {
+  .print\:hidden {
+    display: none !important;
+  }
+
+  .print\:border-0 {
+    border: 0 !important;
+  }
+
+  body {
+    background: white !important;
+  }
+
+  @page {
+    margin: 2cm;
+  }
+}

@@ -62,7 +62,7 @@ export function WarehouseTransactionDialog({
     defaultValues: {
       item_id: itemId,
       type: "in" as const,
-      quantity: "0",
+      quantity: 0,
       user_id: currentUserId,
       project_id: "",
       notes: "",
@@ -92,7 +92,7 @@ export function WarehouseTransactionDialog({
       form.reset({
         item_id: itemId,
         type: "in",
-        quantity: "0",
+        quantity: 0,
         user_id: currentUserId,
         project_id: "",
         notes: "",
@@ -170,12 +170,16 @@ export function WarehouseTransactionDialog({
                 <FormItem>
                   <FormLabel>Количество</FormLabel>
                   <FormControl>
-                    <Input 
-                      {...field} 
-                      type="number" 
+                    <Input
+                      type="number"
                       step="0.01"
-                      placeholder="0" 
+                      placeholder="0"
                       data-testid="input-transaction-quantity"
+                      value={field.value}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(',', '.');
+                        field.onChange(value ? parseFloat(value) : 0);
+                      }}
                     />
                   </FormControl>
                   <FormMessage />
