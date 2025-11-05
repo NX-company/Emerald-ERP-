@@ -62,23 +62,24 @@ router.get("/api/users/:id", async (req, res) => {
       return;
     }
 
-    // Add all permissions for admin user
-    if (user.username === 'admin') {
-      res.json({
-        ...user,
-        can_create_deals: true,
-        can_edit_deals: true,
-        can_delete_deals: true,
-        can_view_deals: true,
-        can_create_projects: true,
-        can_edit_projects: true,
-        can_delete_projects: true,
-        can_view_projects: true,
-      });
-      return;
-    }
+    // Get user permissions from role_permissions table
+    const permissions = await usersRepository.getUserPermissions(user.role_id);
 
-    res.json(user);
+    // Check specific permissions for deals and projects
+    const salesPerms = permissions.find(p => p.module === 'sales');
+    const projectsPerms = permissions.find(p => p.module === 'projects');
+
+    res.json({
+      ...user,
+      can_create_deals: salesPerms?.can_create || false,
+      can_edit_deals: salesPerms?.can_edit || false,
+      can_delete_deals: salesPerms?.can_delete || false,
+      can_view_deals: salesPerms?.can_view || false,
+      can_create_projects: projectsPerms?.can_create || false,
+      can_edit_projects: projectsPerms?.can_edit || false,
+      can_delete_projects: projectsPerms?.can_delete || false,
+      can_view_projects: projectsPerms?.can_view || false,
+    });
   } catch (error) {
     console.error("Error fetching user:", error);
     res.status(500).json({ error: "Failed to fetch user" });

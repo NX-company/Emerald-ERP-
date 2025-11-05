@@ -98,6 +98,14 @@ export class UsersRepository {
     const { password, ...userWithoutPassword } = result[0];
     return userWithoutPassword;
   }
+
+  async getUserPermissions(roleId: string | null): Promise<any[]> {
+    if (!roleId) return [];
+
+    const { role_permissions } = await import("@shared/schema");
+    const permissions = await db.select().from(role_permissions).where(eq(role_permissions.role_id, roleId));
+    return permissions;
+  }
 }
 
 export const usersRepository = new UsersRepository();
