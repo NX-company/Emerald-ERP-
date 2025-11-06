@@ -18,6 +18,7 @@ const positionSchema = z.object({
   name: z.string().min(1, "Введите название"),
   price: z.coerce.number().min(0, "Цена должна быть больше 0"),
   quantity: z.coerce.number().min(1, "Количество должно быть больше 0"),
+  unit: z.string().default("шт"),
   imageUrl: z.string().optional(),
 });
 
@@ -126,6 +127,7 @@ export function InvoiceFromQuoteDialog({
           name: pos.name,
           price: pos.price,
           quantity: pos.quantity,
+          unit: pos.unit || "шт",
           imageUrl: pos.imageUrl || undefined,
         })),
       });
@@ -152,11 +154,12 @@ export function InvoiceFromQuoteDialog({
         try {
           const quoteData = JSON.parse(selectedQuote.data);
           if (quoteData.positions && Array.isArray(quoteData.positions)) {
-            // Сохраняем imageUrl при копировании позиций из КП
+            // Сохраняем imageUrl и unit при копировании позиций из КП
             const positionsWithImages = quoteData.positions.map((pos: any) => ({
               name: pos.name,
               price: pos.price,
               quantity: pos.quantity,
+              unit: pos.unit || "шт",
               imageUrl: pos.imageUrl || undefined,
             }));
             replace(positionsWithImages);
@@ -341,7 +344,7 @@ export function InvoiceFromQuoteDialog({
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => append({ name: "", price: 0, quantity: 1 })}
+                    onClick={() => append({ name: "", price: 0, quantity: 1, unit: "шт" })}
                   >
                     <Plus className="w-4 h-4 mr-2" />
                     Добавить позицию
@@ -352,10 +355,11 @@ export function InvoiceFromQuoteDialog({
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-[35%]">Название</TableHead>
-                      <TableHead className="w-[18%]">Цена</TableHead>
-                      <TableHead className="w-[12%]">Кол-во</TableHead>
-                      <TableHead className="w-[18%]">Итого</TableHead>
-                      <TableHead className="w-[12%]">Фото</TableHead>
+                      <TableHead className="w-[15%]">Цена</TableHead>
+                      <TableHead className="w-[10%]">Кол-во</TableHead>
+                      <TableHead className="w-[10%]">Ед.изм.</TableHead>
+                      <TableHead className="w-[15%]">Итого</TableHead>
+                      <TableHead className="w-[10%]">Фото</TableHead>
                       <TableHead className="w-[5%]"></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -416,6 +420,33 @@ export function InvoiceFromQuoteDialog({
                                     step="1"
                                   />
                                 </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <FormField
+                            control={form.control}
+                            name={`positions.${index}.unit`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <Select onValueChange={field.onChange} value={field.value} defaultValue="шт">
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="шт" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="шт">шт</SelectItem>
+                                    <SelectItem value="м²">м²</SelectItem>
+                                    <SelectItem value="м.п.">м.п.</SelectItem>
+                                    <SelectItem value="м">м</SelectItem>
+                                    <SelectItem value="кг">кг</SelectItem>
+                                    <SelectItem value="л">л</SelectItem>
+                                    <SelectItem value="уп">уп</SelectItem>
+                                  </SelectContent>
+                                </Select>
                                 <FormMessage />
                               </FormItem>
                             )}

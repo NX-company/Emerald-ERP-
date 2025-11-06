@@ -137,7 +137,7 @@ async function seedStageTypes() {
         id: nanoid(),
         name: template.name,
         description: template.description,
-        is_active: template.is_active,
+        is_active: template.is_active ? 1 : 0,
         stages: JSON.stringify(template.stages),
       });
       console.log(`✅ Template "${template.name}" created`);

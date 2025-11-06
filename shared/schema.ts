@@ -143,7 +143,12 @@ export const deal_contacts = pgTable('deal_contacts', {
   created_at: timestamp('created_at').$defaultFn(() => new Date()).notNull(),
 });
 
-export const insertDealContactSchema = createInsertSchema(deal_contacts).omit({ id: true, created_at: true });
+export const insertDealContactSchema = createInsertSchema(deal_contacts)
+  .omit({ id: true, created_at: true })
+  .extend({
+    is_primary: z.boolean().optional().transform((val) => val ? 1 : 0),
+    order: z.number().optional().default(0),
+  });
 export type InsertDealContact = z.infer<typeof insertDealContactSchema>;
 export type DealContact = typeof deal_contacts.$inferSelect;
 
@@ -687,7 +692,11 @@ export const custom_field_definitions = pgTable('custom_field_definitions', {
   created_at: timestamp('created_at').$defaultFn(() => new Date()).notNull(),
 });
 
-export const insertCustomFieldDefinitionSchema = createInsertSchema(custom_field_definitions).omit({ id: true, created_at: true });
+export const insertCustomFieldDefinitionSchema = createInsertSchema(custom_field_definitions)
+  .omit({ id: true, created_at: true })
+  .extend({
+    is_required: z.boolean().optional().transform((val) => val ? 1 : 0),
+  });
 export type InsertCustomFieldDefinition = z.infer<typeof insertCustomFieldDefinitionSchema>;
 export type CustomFieldDefinition = typeof custom_field_definitions.$inferSelect;
 
@@ -725,6 +734,7 @@ export const process_templates = pgTable('process_templates', {
   id: text('id').$defaultFn(() => genId()).primaryKey(),
   name: text('name').notNull(),
   description: text('description'),
+  stages: text('stages'), // JSON string of stages configuration
   created_by: text('created_by').references(() => users.id),
   is_active: boolean('is_active').default(true).notNull(),
   created_at: timestamp('created_at').$defaultFn(() => new Date()).notNull(),

@@ -30,7 +30,7 @@ export class DealContactsRepository {
     if (data.is_primary) {
       await db
         .update(deal_contacts)
-        .set({ is_primary: false })
+        .set({ is_primary: 0 })
         .where(eq(deal_contacts.deal_id, data.deal_id));
     }
 
@@ -50,10 +50,10 @@ export class DealContactsRepository {
       if (contact) {
         await db
           .update(deal_contacts)
-          .set({ is_primary: false })
+          .set({ is_primary: 0 })
           .where(and(
             eq(deal_contacts.deal_id, contact.deal_id),
-            eq(deal_contacts.is_primary, true)
+            eq(deal_contacts.is_primary, 1)
           ));
       }
     }
@@ -81,7 +81,7 @@ export class DealContactsRepository {
       .from(deal_contacts)
       .where(and(
         eq(deal_contacts.deal_id, dealId),
-        eq(deal_contacts.is_primary, true)
+        eq(deal_contacts.is_primary, 1)
       ))
       .limit(1);
 

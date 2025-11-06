@@ -145,13 +145,19 @@ export function DealCardModal({ dealId, open, onOpenChange }: DealCardModalProps
       return await apiRequest('DELETE', `/api/deals/${dealId}`);
     },
     onSuccess: () => {
+      // Close dialogs FIRST to prevent refetch of deleted data
+      setDeleteDialogOpen(false);
+      onOpenChange(false);
+
+      // Then invalidate queries after modal is closed
       queryClient.invalidateQueries({ queryKey: ['/api/deals'] });
+
+      // Show dismissible toast notification
       toast({
         title: "Сделка удалена",
         description: "Сделка успешно удалена",
+        duration: 3000,
       });
-      setDeleteDialogOpen(false);
-      onOpenChange(false);
     },
     onError: (error: any) => {
       toast({

@@ -143,9 +143,10 @@ export function DealCreateDialog({ open, onOpenChange }: DealCreateDialogProps) 
                 <FormItem>
                   <FormLabel>Компания</FormLabel>
                   <FormControl>
-                    <Input 
-                      {...field} 
-                      placeholder="Название компании" 
+                    <Input
+                      {...field}
+                      value={field.value ?? ""}
+                      placeholder="Название компании"
                       data-testid="input-create-company"
                     />
                   </FormControl>
@@ -161,11 +162,13 @@ export function DealCreateDialog({ open, onOpenChange }: DealCreateDialogProps) 
                 <FormItem>
                   <FormLabel>Сумма</FormLabel>
                   <FormControl>
-                    <Input 
-                      {...field} 
-                      type="number" 
-                      placeholder="0.00" 
+                    <Input
+                      {...field}
+                      value={field.value ?? ""}
+                      type="number"
+                      placeholder="0.00"
                       data-testid="input-create-amount"
+                      onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : null)}
                     />
                   </FormControl>
                   <FormMessage />

@@ -359,6 +359,12 @@ export class ProjectsRepository {
 
     const project = await this.createProject(projectData);
 
+    console.log("=== CREATE PROJECT FROM INVOICE ===");
+    console.log("positionStagesData received:", JSON.stringify(positionStagesData, null, 2));
+    console.log("positionStagesData keys:", positionStagesData ? Object.keys(positionStagesData) : "undefined");
+    console.log("selectedPositionIndices:", selectedPositionIndices);
+    console.log("editedPositions length:", editedPositions?.length);
+
     // Если переданы отредактированные позиции, используем их
     if (editedPositions && editedPositions.length > 0 && selectedPositionIndices && selectedPositionIndices.length > 0) {
       const positionsToAdd = selectedPositionIndices.map(index => editedPositions[index]).filter(p => p);
@@ -376,26 +382,35 @@ export class ProjectsRepository {
 
       if (itemsData.length > 0) {
         const createdItems = await db.insert(project_items).values(itemsData).returning();
-        
+
         // Создать этапы и зависимости для каждой позиции, если они есть
         if (positionStagesData && selectedPositionIndices) {
+          console.log("=== CREATING STAGES FOR POSITIONS (editedPositions branch) ===");
           for (let i = 0; i < selectedPositionIndices.length; i++) {
             const positionIndex = selectedPositionIndices[i];
             const itemId = createdItems[i]?.id;
+            console.log(`Position ${i}: positionIndex=${positionIndex}, itemId=${itemId}`);
+            console.log(`Looking for key: "${positionIndex.toString()}"`);
             const stagesData = positionStagesData[positionIndex.toString()];
-            
+            console.log(`stagesData for position ${positionIndex}:`, stagesData ? `${stagesData.stages?.length || 0} stages` : "undefined");
+
             if (itemId && stagesData?.stages && stagesData.stages.length > 0) {
+              console.log(`Creating ${stagesData.stages.length} stages for item ${itemId}`);
               await this.createStagesWithDependencies(
-                project.id, 
-                itemId, 
-                stagesData.stages, 
+                project.id,
+                itemId,
+                stagesData.stages,
                 stagesData.dependencies
               );
+            } else {
+              console.log(`Skipping: itemId=${itemId}, hasStagesData=${!!stagesData}, stagesCount=${stagesData?.stages?.length || 0}`);
             }
           }
+        } else {
+          console.log("Skipping stage creation: positionStagesData or selectedPositionIndices missing");
         }
       }
-    } 
+    }
     // Иначе используем оригинальные позиции из счета
     else if (invoice.data?.positions && Array.isArray(invoice.data.positions)) {
       let positionsToAdd = invoice.data.positions;

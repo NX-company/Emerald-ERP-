@@ -97,7 +97,8 @@ export function generateSimplePDF(document: DealDocument): string {
         <th>Фото</th>
         <th>Наименование</th>
         <th>Цена</th>
-        <th>Количество</th>
+        <th>Кол-во</th>
+        <th>Ед.изм.</th>
         <th>Сумма</th>
       </tr>
     </thead>
@@ -109,6 +110,7 @@ export function generateSimplePDF(document: DealDocument): string {
     const imageCell = pos.imageUrl
       ? `<img src="${pos.imageUrl}" alt="Фото" class="item-image" />`
       : '—';
+    const unit = pos.unit || 'шт'; // Default to "шт" if unit is not specified
 
     html += `
       <tr>
@@ -117,6 +119,7 @@ export function generateSimplePDF(document: DealDocument): string {
         <td>${pos.name}</td>
         <td>${pos.price.toLocaleString('ru-RU')} ₽</td>
         <td>${pos.quantity}</td>
+        <td>${unit}</td>
         <td>${total.toLocaleString('ru-RU')} ₽</td>
       </tr>
     `;

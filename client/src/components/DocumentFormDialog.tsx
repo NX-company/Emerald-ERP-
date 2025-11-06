@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Plus, Trash2, Image as ImageIcon, X, ZoomIn } from "lucide-react";
@@ -18,6 +19,7 @@ const positionSchema = z.object({
   name: z.string().min(1, "Введите название"),
   price: z.coerce.number().min(0, "Цена должна быть больше 0"),
   quantity: z.coerce.number().min(1, "Количество должно быть больше 0"),
+  unit: z.string().default("шт"),
   imageUrl: z.string().optional(),
 });
 
@@ -88,7 +90,7 @@ export function DocumentFormDialog({
     resolver: zodResolver(documentFormSchema),
     defaultValues: {
       name: "",
-      positions: [{ name: "", price: 0, quantity: 1, imageUrl: undefined }],
+      positions: [{ name: "", price: 0, quantity: 1, unit: "шт", imageUrl: undefined }],
       is_signed: false,
     },
   });
@@ -111,13 +113,14 @@ export function DocumentFormDialog({
       const docData = typeof editingDocument.data === 'string'
         ? JSON.parse(editingDocument.data)
         : editingDocument.data as any;
-      const positions = docData?.positions || [{ name: "", price: 0, quantity: 1, imageUrl: undefined }];
+      const positions = docData?.positions || [{ name: "", price: 0, quantity: 1, unit: "шт", imageUrl: undefined }];
       form.reset({
         name: editingDocument.name,
         positions: positions.map((pos: any) => ({
           name: pos.name,
           price: pos.price,
           quantity: pos.quantity,
+          unit: pos.unit || "шт", // Default to "шт" for old documents
           imageUrl: pos.imageUrl || undefined,
         })),
         is_signed: editingDocument.is_signed || false,
@@ -125,7 +128,7 @@ export function DocumentFormDialog({
     } else if (!isEditing && open) {
       form.reset({
         name: "",
-        positions: [{ name: "", price: 0, quantity: 1, imageUrl: undefined }],
+        positions: [{ name: "", price: 0, quantity: 1, unit: "шт", imageUrl: undefined }],
         is_signed: false,
       });
     }
@@ -270,7 +273,7 @@ export function DocumentFormDialog({
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => append({ name: "", price: 0, quantity: 1, imageUrl: undefined })}
+                  onClick={() => append({ name: "", price: 0, quantity: 1, unit: "шт", imageUrl: undefined })}
                   data-testid="button-add-position"
                 >
                   <Plus className="w-4 h-4 mr-1" />
@@ -284,7 +287,8 @@ export function DocumentFormDialog({
                     <TableRow>
                       <TableHead>Название</TableHead>
                       <TableHead className="w-32">Цена</TableHead>
-                      <TableHead className="w-32">Кол-во</TableHead>
+                      <TableHead className="w-24">Кол-во</TableHead>
+                      <TableHead className="w-24">Ед.изм.</TableHead>
                       <TableHead className="w-32">Итого</TableHead>
                       <TableHead className="w-20">Фото</TableHead>
                       <TableHead className="w-16"></TableHead>
@@ -353,6 +357,33 @@ export function DocumentFormDialog({
                                     data-testid={`input-position-quantity-${index}`}
                                   />
                                 </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <FormField
+                            control={form.control}
+                            name={`positions.${index}.unit`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <Select onValueChange={field.onChange} value={field.value} defaultValue="шт">
+                                  <FormControl>
+                                    <SelectTrigger data-testid={`select-position-unit-${index}`}>
+                                      <SelectValue placeholder="шт" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="шт">шт</SelectItem>
+                                    <SelectItem value="м²">м²</SelectItem>
+                                    <SelectItem value="м.п.">м.п.</SelectItem>
+                                    <SelectItem value="м">м</SelectItem>
+                                    <SelectItem value="кг">кг</SelectItem>
+                                    <SelectItem value="л">л</SelectItem>
+                                    <SelectItem value="уп">уп</SelectItem>
+                                  </SelectContent>
+                                </Select>
                                 <FormMessage />
                               </FormItem>
                             )}
